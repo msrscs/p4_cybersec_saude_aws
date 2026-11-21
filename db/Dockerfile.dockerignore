@@ -9,6 +9,9 @@
 !backend/scripts/__init__.py
 !backend/scripts/bootstrap_db.py
 !backend/scripts/importar_cid.py
+!backend/scripts/criar_usuario.py
+!backend/scripts/atribuir_grupo.py
+!backend/scripts/resetar_acesso.py
 !db/migrations
 !db/seeds
 **/__pycache__

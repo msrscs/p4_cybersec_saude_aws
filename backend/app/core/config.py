@@ -2,8 +2,9 @@
 
 from functools import cached_property, lru_cache
 from typing import Literal, Self
+from urllib.parse import urlsplit
 
-from pydantic import SecretStr, model_validator
+from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from sqlalchemy import URL
 
@@ -41,6 +42,12 @@ class Settings(BaseSettings):
     # Custo do bcrypt (ADR-0003). Abaixo de 12 só é aceito em ENVIRONMENT=test.
     bcrypt_rounds: int = 12
 
+    # Telemetria (ADR-0031). Sem endpoint, nada é exportado. Ex.: http://10.0.0.10:4318
+    otel_exporter_otlp_endpoint: str | None = None
+    otel_service_name: str = "cybersec-backend"
+    # Fração dos traces iniciados aqui; os que vêm do frontend seguem a decisão dele.
+    otel_traces_sampler_arg: float = Field(default=1.0, ge=0.0, le=1.0)
+
     @model_validator(mode="after")
     def _validar_chaves(self) -> Self:
         # Falha na inicialização se alguma chave for inválida; mensagens sem material de chave.
@@ -66,6 +73,25 @@ class Settings(BaseSettings):
         if not minimo <= self.bcrypt_rounds <= 16:
             raise ValueError(f"BCRYPT_ROUNDS deve estar entre {minimo} e 16.")
         return self
+
+    @field_validator("otel_exporter_otlp_endpoint")
+    @classmethod
+    def _validar_endpoint_otlp(cls, valor: str | None) -> str | None:
+        if valor is None:
+            return None
+        url = urlsplit(valor)
+        # Só esquema + host + porta: credencial na URL iria parar em log de erro do exportador.
+        if (
+            url.scheme not in {"http", "https"}
+            or not url.hostname
+            or url.username
+            or url.password
+            or url.path not in {"", "/"}
+            or url.query
+            or url.fragment
+        ):
+            raise ValueError("OTEL_EXPORTER_OTLP_ENDPOINT deve ser só esquema, host e porta.")
+        return valor.rstrip("/")
 
     @property
     def is_production(self) -> bool:

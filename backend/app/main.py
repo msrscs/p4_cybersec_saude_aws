@@ -6,9 +6,10 @@ from app.core.database import criar_engine, criar_sessionmaker
 from app.core.errors import register_error_handlers
 from app.core.headers import registrar_headers_seguranca
 from app.core.requisicao import registrar_request_id
+from app.core.telemetria import Telemetria, criar_telemetria, instrumentar
 
 
-def create_app(settings: Settings | None = None) -> FastAPI:
+def create_app(settings: Settings | None = None, telemetria: Telemetria | None = None) -> FastAPI:
     settings = settings or get_settings()
     docs_url = None if settings.is_production else "/docs"
     app = FastAPI(
@@ -31,4 +32,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(usuarios.router)
     app.include_router(cadastros.router)
     app.include_router(ocis.router)
+    telemetria = telemetria or criar_telemetria(settings)
+    if telemetria is not None:
+        instrumentar(app, app.state.engine, telemetria)
     return app

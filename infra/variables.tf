@@ -1,7 +1,9 @@
 variable "regiao" {
-  description = "Região AWS. São Paulo mantém os dados de saúde no Brasil (LGPD, ADR-0032)."
+  # us-east-1 por custo (projeto acadêmico, ADR-0033). Com dados de saúde reais, use sa-east-1
+  # (LGPD, transferência internacional): troque aqui, em backend.hcl e em bootstrap/.
+  description = "Região AWS."
   type        = string
-  default     = "sa-east-1"
+  default     = "us-east-1"
 }
 
 variable "cidr_vpc" {

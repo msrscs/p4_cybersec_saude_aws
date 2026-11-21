@@ -123,7 +123,7 @@ Implementação (ADR-0011): usuário → `usuario_grupo` → `grupo_papel` → `
 
 ## 8. Implantação
 - **Módulos** (ADR-0029): `frontend/`, `backend/` e `db/`, cada um com a própria imagem. Todas usam usuário não-root, sistema de arquivos somente leitura e nenhuma capability.
-- **AWS** (Terraform em `infra/`, região `sa-east-1`; passo a passo em `infra/README.md`):
+- **AWS** (Terraform em `infra/`, região `us-east-1` no ambiente acadêmico, só com dados fictícios, ADR-0033; passo a passo em `infra/README.md`):
   - VPC `cybersec-vpc` em 2 AZs, com subnets públicas (NAT único e EC2 do Grafana), privadas de borda (ALB interno), privadas de aplicação (tasks) e privadas de dados (RDS, sem rota para a internet);
   - o CloudFront termina o TLS com o certificado padrão e alcança o ALB interno por VPC Origin, sem domínio próprio nem ACM;
   - frontend e backend são serviços ECS Fargate com 2 tasks cada (auto scaling): o ALB só alcança o frontend, e só o frontend alcança o backend (security groups);

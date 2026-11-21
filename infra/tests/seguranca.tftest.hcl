@@ -4,7 +4,7 @@
 
 mock_provider "aws" {
   mock_data "aws_availability_zones" {
-    defaults = { names = ["sa-east-1a", "sa-east-1b", "sa-east-1c"] }
+    defaults = { names = ["us-east-1a", "us-east-1b", "us-east-1c"] }
   }
   mock_data "aws_caller_identity" {
     defaults = { account_id = "111122223333" }
@@ -17,11 +17,11 @@ mock_provider "aws" {
   }
   mock_resource "aws_db_instance" {
     defaults = {
-      address = "cybersec-db.abc.sa-east-1.rds.amazonaws.com"
+      address = "cybersec-db.abc.us-east-1.rds.amazonaws.com"
       port    = 5432
       master_user_secret = [{
-        secret_arn    = "arn:aws:secretsmanager:sa-east-1:111122223333:secret:rds!db-abc"
-        kms_key_id    = "arn:aws:kms:sa-east-1:111122223333:key/abc"
+        secret_arn    = "arn:aws:secretsmanager:us-east-1:111122223333:secret:rds!db-abc"
+        kms_key_id    = "arn:aws:kms:us-east-1:111122223333:key/abc"
         secret_status = "active"
       }]
     }
@@ -30,40 +30,40 @@ mock_provider "aws" {
     defaults = { domain_name = "d111111abcdef8.cloudfront.net" }
   }
   mock_resource "aws_ecr_repository" {
-    defaults = { repository_url = "111122223333.dkr.ecr.sa-east-1.amazonaws.com/cybersec/modulo" }
+    defaults = { repository_url = "111122223333.dkr.ecr.us-east-1.amazonaws.com/cybersec/modulo" }
   }
   mock_resource "aws_kms_key" {
-    defaults = { arn = "arn:aws:kms:sa-east-1:111122223333:key/abc" }
+    defaults = { arn = "arn:aws:kms:us-east-1:111122223333:key/abc" }
   }
   mock_resource "aws_cloudwatch_log_group" {
-    defaults = { arn = "arn:aws:logs:sa-east-1:111122223333:log-group:mock" }
+    defaults = { arn = "arn:aws:logs:us-east-1:111122223333:log-group:mock" }
   }
   mock_resource "aws_iam_role" {
     defaults = { arn = "arn:aws:iam::111122223333:role/mock" }
   }
   mock_resource "aws_service_discovery_http_namespace" {
-    defaults = { arn = "arn:aws:servicediscovery:sa-east-1:111122223333:namespace/ns-mock" }
+    defaults = { arn = "arn:aws:servicediscovery:us-east-1:111122223333:namespace/ns-mock" }
   }
   mock_resource "aws_lb" {
-    defaults = { arn = "arn:aws:elasticloadbalancing:sa-east-1:111122223333:loadbalancer/app/mock/abc" }
+    defaults = { arn = "arn:aws:elasticloadbalancing:us-east-1:111122223333:loadbalancer/app/mock/abc" }
   }
   mock_resource "aws_lb_target_group" {
-    defaults = { arn = "arn:aws:elasticloadbalancing:sa-east-1:111122223333:targetgroup/mock/abc" }
+    defaults = { arn = "arn:aws:elasticloadbalancing:us-east-1:111122223333:targetgroup/mock/abc" }
   }
   mock_resource "aws_lb_listener" {
-    defaults = { arn = "arn:aws:elasticloadbalancing:sa-east-1:111122223333:listener/app/mock/abc/def" }
+    defaults = { arn = "arn:aws:elasticloadbalancing:us-east-1:111122223333:listener/app/mock/abc/def" }
   }
   mock_resource "aws_ecs_cluster" {
-    defaults = { arn = "arn:aws:ecs:sa-east-1:111122223333:cluster/cybersec" }
+    defaults = { arn = "arn:aws:ecs:us-east-1:111122223333:cluster/cybersec" }
   }
   mock_resource "aws_sns_topic" {
-    defaults = { arn = "arn:aws:sns:sa-east-1:111122223333:cybersec-alertas" }
+    defaults = { arn = "arn:aws:sns:us-east-1:111122223333:cybersec-alertas" }
   }
   mock_resource "aws_secretsmanager_secret" {
-    defaults = { arn = "arn:aws:secretsmanager:sa-east-1:111122223333:secret:cybersec/mock-abc" }
+    defaults = { arn = "arn:aws:secretsmanager:us-east-1:111122223333:secret:cybersec/mock-abc" }
   }
   mock_resource "aws_cloudwatch_event_rule" {
-    defaults = { arn = "arn:aws:events:sa-east-1:111122223333:rule/mock" }
+    defaults = { arn = "arn:aws:events:us-east-1:111122223333:rule/mock" }
   }
   mock_resource "aws_s3_bucket" {
     defaults = { arn = "arn:aws:s3:::mock" }
@@ -73,8 +73,8 @@ mock_provider "aws" {
   }
   mock_resource "aws_ecs_task_definition" {
     defaults = {
-      arn                  = "arn:aws:ecs:sa-east-1:111122223333:task-definition/cybersec-mock:1"
-      arn_without_revision = "arn:aws:ecs:sa-east-1:111122223333:task-definition/cybersec-mock"
+      arn                  = "arn:aws:ecs:us-east-1:111122223333:task-definition/cybersec-mock:1"
+      arn_without_revision = "arn:aws:ecs:us-east-1:111122223333:task-definition/cybersec-mock"
     }
   }
   mock_data "aws_elb_service_account" {

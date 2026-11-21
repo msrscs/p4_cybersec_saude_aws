@@ -13,7 +13,7 @@ terraform {
 variable "regiao" {
   description = "Região do bucket de state (a mesma do ambiente)."
   type        = string
-  default     = "sa-east-1"
+  default     = "us-east-1"
 }
 
 provider "aws" {

@@ -2,6 +2,6 @@
 # O bucket é criado por infra/bootstrap.
 bucket       = "cybersec-tfstate-<conta>"
 key          = "prod/terraform.tfstate"
-region       = "sa-east-1"
+region       = "us-east-1"
 encrypt      = true
 use_lockfile = true

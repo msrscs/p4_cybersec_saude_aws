@@ -18,4 +18,6 @@ USER node
 EXPOSE 3000
 HEALTHCHECK --interval=10s --timeout=3s --retries=5 \
     CMD ["node", "-e", "fetch('http://127.0.0.1:3000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
-CMD ["node", "src/server.js"]
+# A instrumentação OpenTelemetry entra antes do Express; sem OTEL_EXPORTER_OTLP_ENDPOINT, não faz nada
+# (ADR-0031).
+CMD ["node", "--import", "./src/instrumentacao.js", "src/server.js"]

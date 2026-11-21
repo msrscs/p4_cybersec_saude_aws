@@ -123,15 +123,17 @@ Implementação (ADR-0011): usuário → `usuario_grupo` → `grupo_papel` → `
 
 ## 8. Implantação
 - **Módulos** (ADR-0029): `frontend/`, `backend/` e `db/`, cada um com a própria imagem. Todas usam usuário não-root, sistema de arquivos somente leitura e nenhuma capability.
-- **AWS** (Terraform em `infra/`):
+- **AWS** (Terraform em `infra/`, região `sa-east-1`; passo a passo em `infra/README.md`):
   - VPC `cybersec-vpc` em 2 AZs, com subnets públicas (NAT único e EC2 do Grafana), privadas de borda (ALB interno), privadas de aplicação (tasks) e privadas de dados (RDS, sem rota para a internet);
   - o CloudFront termina o TLS com o certificado padrão e alcança o ALB interno por VPC Origin, sem domínio próprio nem ACM;
   - frontend e backend são serviços ECS Fargate com 2 tasks cada (auto scaling): o ALB só alcança o frontend, e só o frontend alcança o backend (security groups);
   - RDS PostgreSQL 18 (`cybersec-db`) com `rds.force_ssl=1`, acessado com `verify-full` e a CA do RDS embutida nas imagens;
-  - rotinas pelo EventBridge Scheduler e migrations como task avulsa;
+  - rotinas pelo EventBridge Scheduler (uma task definition por rotina) e migrations e bootstrap como tasks avulsas;
+  - scripts administrativos (criar o primeiro administrador etc.) numa task `administracao` aberta sob demanda por ECS Exec, sem gravação do conteúdo da sessão;
+  - cada task com execution role própria, que lê só os próprios segredos; senhas do banco geradas sem passar pelo state (ADR-0032);
   - Grafana em EC2 pública sem portas abertas para a internet, acessada por SSM.
 
-  Requisitos de infraestrutura e variáveis por task: ADR-0029, atualizado pelo ADR-0030.
+  Requisitos de infraestrutura e variáveis por task: ADR-0029, atualizado pelos ADR-0030 e ADR-0032.
 - **CI/CD** (`CICD.PNG`): PR no GitHub com check do CodeBuild; merge na `main` dispara o CodePipeline (segurança, observabilidade, imagem, migrations, deploy).
 - **Desenvolvimento** (`docker compose up`):
   - `db` (Postgres 18, porta 127.0.0.1:5433, TLS obrigatório com certificado efêmero gerado no container), `backend`, `tarefas` e `frontend` (`http://localhost:3000`);

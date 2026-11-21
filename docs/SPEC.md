@@ -164,7 +164,7 @@ Cada tarefa deve ser pequena, testável e entregar valor.
 - [x] T09 Hardening (headers, rate limit, CSRF)
 - [x] T10 Revisão de segurança + relatório final
 - [x] T11 Módulos separados para a AWS (sem Caddy/CA interna, CA do RDS, rotinas por Scheduler; ADR-0029)
-- [ ] T12 Observabilidade: OpenTelemetry (`OTEL_*`) exportando para o Grafana, sem dados sensíveis
+- [x] T12 Observabilidade: OpenTelemetry (`OTEL_*`) exportando para o Grafana, sem dados sensíveis (ADR-0031)
 - [ ] T13 Infraestrutura em Terraform (`infra/`): VPC, NAT, CloudFront VPC Origin, ALB interno, ECS Fargate 2+2, RDS `cybersec-db`, Secrets Manager, ECR, Scheduler (ADR-0030)
 - [ ] T14 Grafana em EC2: OTel Collector com redação, Tempo, Loki, Prometheus; acesso só por SSM (ADR-0030)
 - [ ] T15 CI/CD: buildspecs, CodeBuild de PR, CodePipeline com migrations e deploy, roles de menor privilégio; remove o GitHub Actions (ADR-0030)

@@ -34,7 +34,7 @@ flowchart LR
 | Migrations | Imagem `db/` (Alembic) | Migrations, bootstrap das roles e importação do CID, como task avulsa (ADR-0029) |
 | Banco | RDS PostgreSQL 18, instância `cybersec-db` (AWS); PostgreSQL 18 no Docker (dev) | Persistência, triggers WORM, permissões por role |
 | Chaves | Secrets Manager (AWS); `.env` (dev) | Guarda a KEK que cifra as DEKs |
-| Observabilidade | OpenTelemetry → OTel Collector + Grafana em EC2 | Traces, métricas e logs sem dado sensível; acesso só por SSM (ADR-0030) |
+| Observabilidade | OpenTelemetry (OTLP/HTTP) → OTel Collector + Grafana em EC2 | Traces e métricas com lista de permissão de atributos (rota como modelo, sem URL, IP, cabeçalhos, SQL nem mensagem de exceção); logs em stdout/CloudWatch; acesso só por SSM (ADR-0030, ADR-0031) |
 | CI/CD | CodeConnections + CodePipeline + CodeBuild + ECR | Check de segurança nos PRs do GitHub; na `main`: fitness functions, imagem com a tag do commit, migrations e rolling update (ADR-0030) |
 
 ## 3. Camadas do backend

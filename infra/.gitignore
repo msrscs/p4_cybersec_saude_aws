@@ -1,0 +1,13 @@
+# State e planos podem conter dados sensíveis (ex.: cabeçalho secreto de origem).
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+crash.log
+crash.*.log
+# Configuração local: conta, e-mail de alertas.
+backend.hcl
+*.tfvars
+*.tfvars.json
+!exemplo.tfvars
+# O .terraform.lock.hcl é versionado (hashes dos providers).

@@ -1,0 +1,7 @@
+# Copie para backend.hcl (fora do git) e troque <conta> pelo id da conta AWS.
+# O bucket é criado por infra/bootstrap.
+bucket       = "cybersec-tfstate-<conta>"
+key          = "prod/terraform.tfstate"
+region       = "sa-east-1"
+encrypt      = true
+use_lockfile = true

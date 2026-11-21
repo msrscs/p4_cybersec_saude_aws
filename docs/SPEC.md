@@ -138,7 +138,7 @@ login_success, login_failure, mfa_success, mfa_failure, password_change, sensiti
 Campos: id, timestamp, user_id, evento, ip, detalhes (sem dados sensíveis), prev_hash, hash.
 
 ## 7. Arquitetura (resumo)
-Navegador -> CloudFront/ALB -> Frontend Node.js -> API Python (FastAPI) -> Aurora PostgreSQL (AWS, ADR-0029).
+Navegador -> CloudFront (VPC Origin) -> ALB interno -> Frontend Node.js -> API Python (FastAPI) -> RDS PostgreSQL 18 (AWS, ADR-0029 e ADR-0030). Telemetria OpenTelemetry -> Grafana em EC2; CI/CD por CodePipeline + CodeBuild.
 Detalhes em `ARCHITECTURE.md`. Decisões em `/docs/adr`.
 
 ## 8. Ameaças principais
@@ -165,6 +165,9 @@ Cada tarefa deve ser pequena, testável e entregar valor.
 - [x] T10 Revisão de segurança + relatório final
 - [x] T11 Módulos separados para a AWS (sem Caddy/CA interna, CA do RDS, rotinas por Scheduler; ADR-0029)
 - [ ] T12 Observabilidade: OpenTelemetry (`OTEL_*`) exportando para o Grafana, sem dados sensíveis
+- [ ] T13 Infraestrutura em Terraform (`infra/`): VPC, NAT, CloudFront VPC Origin, ALB interno, ECS Fargate 2+2, RDS `cybersec-db`, Secrets Manager, ECR, Scheduler (ADR-0030)
+- [ ] T14 Grafana em EC2: OTel Collector com redação, Tempo, Loki, Prometheus; acesso só por SSM (ADR-0030)
+- [ ] T15 CI/CD: buildspecs, CodeBuild de PR, CodePipeline com migrations e deploy, roles de menor privilégio; remove o GitHub Actions (ADR-0030)
 
 ## 10. Critérios de pronto
 - Testes passando, lint e `bandit`/`npm audit` sem críticos

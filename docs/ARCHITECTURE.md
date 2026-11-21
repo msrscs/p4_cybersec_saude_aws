@@ -7,30 +7,35 @@ Sistema web para [descrever: ex. gestão de prontuários/consultas] com dados de
 
 ## 2. Visão geral (C4: containers)
 
-Implantação na AWS (ADR-0029):
+Implantação na AWS (ADR-0029, ADR-0030; desenho de referência em `Arquitetura.PNG`):
 
 ```mermaid
 flowchart LR
-    U[Usuário no navegador] -->|HTTPS, ACM| CF[CloudFront + WAF]
-    CF -->|HTTPS + cabeçalho secreto de origem| ALB[ALB]
-    ALB -->|HTTP na VPC, subnet privada| F[Frontend Node.js: task Fargate]
-    F -->|HTTP na VPC, Service Connect + cookie de sessão + token CSRF| B[API FastAPI: task Fargate]
-    B -->|SQL parametrizado, TLS verify-full, CA do RDS| D[(Aurora Serverless v2 PostgreSQL)]
+    U[Usuário no navegador] -->|HTTPS, certificado *.cloudfront.net| CF[CloudFront + WAF]
+    CF -->|VPC Origin, rede da AWS + cabeçalho secreto de origem| ALB[ALB interno: subnets privadas de borda]
+    ALB -->|HTTP na VPC| F[Frontend Node.js: 2 tasks Fargate]
+    F -->|HTTP na VPC, Service Connect + cookie de sessão + token CSRF| B[API FastAPI: 2 tasks Fargate]
+    B -->|SQL parametrizado, TLS verify-full, CA do RDS| D[(RDS PostgreSQL 18: cybersec-db)]
     B -->|KEK| K[Secrets Manager]
     S[EventBridge Scheduler: rotinas] -->|task avulsa, imagem do backend| D
     M[Task avulsa: imagem db, migrations] -->|TLS verify-full| D
     D --- A[(log WORM)]
+    F -.->|OTLP, rede privada| G[EC2 pública: OTel Collector + Grafana]
+    B -.->|OTLP, rede privada| G
+    Op[Equipe] -->|SSM port forwarding| G
 ```
 
 | Componente | Tecnologia | Responsabilidade |
 |---|---|---|
-| Borda | CloudFront + ALB (ACM) | Único ponto exposto: TLS na entrada, redirecionamento de HTTP, timeouts e IP real do cliente (`CloudFront-Viewer-Address`) (ADR-0029) |
+| Borda | CloudFront (VPC Origin) + ALB interno | Único ponto exposto: TLS na entrada (certificado padrão do CloudFront), redirecionamento de HTTP, WAF, timeouts e IP real do cliente (`CloudFront-Viewer-Address`) (ADR-0029, ADR-0030) |
 | Frontend | Node.js | Telas, fluxo de login/MFA, headers de segurança (CSP, HSTS, Trusted Types) e repasse restrito `/api` para a API, com checagem de origem (ADR-0012, ADR-0013) |
 | Backend | Python 3.14 + FastAPI | Regras de negócio, autenticação, MFA, criptografia, auditoria, token CSRF e limite por IP |
 | Tarefas | Python (mesma imagem do backend), EventBridge Scheduler | Limpeza de sessões e contadores, verificação periódica da cadeia do log (ADR-0013, ADR-0029) |
 | Migrations | Imagem `db/` (Alembic) | Migrations, bootstrap das roles e importação do CID, como task avulsa (ADR-0029) |
-| Banco | Aurora Serverless v2 PostgreSQL (AWS); PostgreSQL 18 no Docker (dev) | Persistência, triggers WORM, permissões por role |
+| Banco | RDS PostgreSQL 18, instância `cybersec-db` (AWS); PostgreSQL 18 no Docker (dev) | Persistência, triggers WORM, permissões por role |
 | Chaves | Secrets Manager (AWS); `.env` (dev) | Guarda a KEK que cifra as DEKs |
+| Observabilidade | OpenTelemetry → OTel Collector + Grafana em EC2 | Traces, métricas e logs sem dado sensível; acesso só por SSM (ADR-0030) |
+| CI/CD | CodeConnections + CodePipeline + CodeBuild + ECR | Check de segurança nos PRs do GitHub; na `main`: fitness functions, imagem com a tag do commit, migrations e rolling update (ADR-0030) |
 
 ## 3. Camadas do backend
 
@@ -92,7 +97,7 @@ Regras (ADR-0002, 0008, 0009): token temporário só vale para a etapa MFA; sess
 | Segredo TOTP | AES-256-GCM |
 | Dados de saúde (CPF, diagnóstico, etc.) | AES-256-GCM por campo |
 | Códigos de recuperação | Hash |
-| Em trânsito | TLS até a borda (CloudFront/ALB) e até o banco; HTTP só dentro da VPC (ADR-0029) |
+| Em trânsito | TLS até o CloudFront e até o banco; HTTP só na rede da AWS (VPC Origin) e dentro da VPC (ADR-0029, ADR-0030) |
 
 ## 6. Log de auditoria WORM
 
@@ -118,13 +123,16 @@ Implementação (ADR-0011): usuário → `usuario_grupo` → `grupo_papel` → `
 
 ## 8. Implantação
 - **Módulos** (ADR-0029): `frontend/`, `backend/` e `db/`, cada um com a própria imagem. Todas usam usuário não-root, sistema de arquivos somente leitura e nenhuma capability.
-- **AWS:**
-  - CloudFront e ALB terminam o TLS (ACM);
-  - frontend e backend são serviços ECS Fargate em subnets privadas: o ALB só alcança o frontend, e só o frontend alcança o backend (security groups);
-  - Aurora Serverless v2 com `rds.force_ssl=1`, acessado com `verify-full` e a CA do RDS embutida nas imagens;
-  - rotinas pelo EventBridge Scheduler e migrations como task avulsa.
-  
-  Requisitos de infraestrutura e variáveis por task estão no ADR-0029.
+- **AWS** (Terraform em `infra/`):
+  - VPC `cybersec-vpc` em 2 AZs, com subnets públicas (NAT único e EC2 do Grafana), privadas de borda (ALB interno), privadas de aplicação (tasks) e privadas de dados (RDS, sem rota para a internet);
+  - o CloudFront termina o TLS com o certificado padrão e alcança o ALB interno por VPC Origin, sem domínio próprio nem ACM;
+  - frontend e backend são serviços ECS Fargate com 2 tasks cada (auto scaling): o ALB só alcança o frontend, e só o frontend alcança o backend (security groups);
+  - RDS PostgreSQL 18 (`cybersec-db`) com `rds.force_ssl=1`, acessado com `verify-full` e a CA do RDS embutida nas imagens;
+  - rotinas pelo EventBridge Scheduler e migrations como task avulsa;
+  - Grafana em EC2 pública sem portas abertas para a internet, acessada por SSM.
+
+  Requisitos de infraestrutura e variáveis por task: ADR-0029, atualizado pelo ADR-0030.
+- **CI/CD** (`CICD.PNG`): PR no GitHub com check do CodeBuild; merge na `main` dispara o CodePipeline (segurança, observabilidade, imagem, migrations, deploy).
 - **Desenvolvimento** (`docker compose up`):
   - `db` (Postgres 18, porta 127.0.0.1:5433, TLS obrigatório com certificado efêmero gerado no container), `backend`, `tarefas` e `frontend` (`http://localhost:3000`);
   - as redes `api` e `dados` são internas: o frontend não alcança o banco;

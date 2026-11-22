@@ -167,7 +167,7 @@ Cada tarefa deve ser pequena, testável e entregar valor.
 - [x] T12 Observabilidade: OpenTelemetry (`OTEL_*`) exportando para o Grafana, sem dados sensíveis (ADR-0031)
 - [x] T13 Infraestrutura em Terraform (`infra/`): VPC, NAT, CloudFront VPC Origin, ALB interno, ECS Fargate 2+2, RDS `cybersec-db`, Secrets Manager, ECR, Scheduler (ADR-0030, ADR-0032)
 - [x] T14 Grafana em EC2: OTel Collector com redação, Tempo, Loki, Prometheus; acesso só por SSM (ADR-0030, ADR-0037)
-- [ ] T15 CI/CD: buildspecs, CodeBuild de PR, CodePipeline com migrations e deploy, roles de menor privilégio; remove o GitHub Actions (ADR-0030)
+- [x] T15 CI/CD: buildspecs, CodeBuild de PR, CodePipeline com migrations e deploy, roles de menor privilégio; remove o GitHub Actions (ADR-0030, ADR-0038)
 
 ## 10. Critérios de pronto
 - Testes passando, lint e `bandit`/`npm audit` sem críticos

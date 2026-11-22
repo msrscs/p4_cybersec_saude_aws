@@ -107,7 +107,7 @@ data "aws_iam_policy_document" "alertas" {
     condition {
       test     = "ArnEquals"
       variable = "aws:SourceArn"
-      values   = [aws_cloudwatch_event_rule.task_com_erro.arn]
+      values   = concat([aws_cloudwatch_event_rule.task_com_erro.arn], aws_cloudwatch_event_rule.pipeline_falhou[*].arn)
     }
   }
 }

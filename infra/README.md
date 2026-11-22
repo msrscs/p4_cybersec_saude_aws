@@ -94,6 +94,34 @@ checkov -d . --framework terraform --skip-path .terraform   # 0 falhas; exceçõ
    Use `/bin/sh` e digite o comando dentro da sessão. Passado por `--command`, o CPF ficaria registrado no CloudTrail. O conteúdo da sessão não é gravado (ADR-0032). A criação do usuário e a mudança de grupo ficam no log WORM da aplicação, e a abertura da sessão fica no CloudTrail. A task se encerra sozinha em 1 h.
 7. **Conferir:** abra `terraform -chdir=infra output -raw url`, faça o login com MFA e veja na consulta do log se o `ip_origem` é o seu IP real, e não um IP 10.20.x.x. Isso confirma a cadeia CloudFront → ALB → frontend → Service Connect → backend (ADR-0029, ADR-0032).
 
+## CI/CD (T15, ADR-0038)
+
+- **Pull requests para a `main`:**
+  - O CodeBuild `cybersec-pr` roda o lote `buildspecs/pr.yml`, com aplicação e infraestrutura em paralelo, e publica o check **`AWS CodeBuild BuildBatch us-east-1 (cybersec-pr)`**.
+  - **Aplicação** (`buildspecs/seguranca.yml`):
+    - backend (ruff, mypy, bandit, pytest com Postgres e TLS, cobertura mínima e pip-audit);
+    - frontend (lint, testes e audit);
+    - Playwright, gitleaks e o build das imagens.
+  - **Infraestrutura** (`buildspecs/observabilidade.yml`): Terraform test, Checkov e o teste de redação.
+  - **Quem dispara:** só PRs dos IDs em `github_atores_permitidos`. PR de fork só roda depois do comentário de aprovação de alguém com escrita. O build não tem segredos nem acesso à conta.
+- **Merge na `main`:** o CodePipeline `cybersec` roda Fonte → Verificação → Imagens (tag = SHA curto) → **Aprovação** → Migrations → Deploy backend → Deploy frontend.
+  - **A aprovação chega por e-mail (SNS).** Antes de aprovar, confira que o ambiente não está pausado (`infra/scripts/ambiente.sh status`). Para aprovar, abra o console do CodePipeline, em `terraform -chdir=infra output -raw pipeline`.
+  - **Migrations:** o `infra/scripts/implantar.sh` registra novas revisões das tasks de banco e das rotinas, roda a migration e grava a tag em `/cybersec/imagem_tag`. As task definitions do Terraform leem essa tag, então um `apply` não volta a versão.
+  - **Deploy:** ECS com circuit breaker e rollback. Uma falha em qualquer etapa interrompe o pipeline e manda e-mail.
+- **Ambiente novo** (a conexão com o GitHub precisa de aceite no console):
+  1. Faça o `apply` com `github_conectado = false` (padrão).
+  2. No console, em Developer Tools → Settings → Connections, abra `cybersec-github`, clique em "Update pending connection" e instale o GitHub App só neste repositório.
+  3. Ponha `github_conectado = true` no `terraform.tfvars` e rode o `apply` de novo.
+  4. Se o projeto `cybersec-pr` falhar com `not authorized to access connection`, é a propagação do IAM: repita o `apply`.
+- **Contingência (deploy à mão):** use a mesma sequência do pipeline:
+  ```bash
+  CLUSTER=cybersec REDE_TASKS_BANCO="$(terraform -chdir=infra output -raw rede_tasks_banco)" \
+    ECR_REGISTRO=<conta>.dkr.ecr.us-east-1.amazonaws.com PREFIXO=cybersec PARAMETRO_TAG=/cybersec/imagem_tag \
+    infra/scripts/implantar.sh <tag>   # a tag já publicada no ECR
+  for s in backend frontend; do aws ecs update-service --cluster cybersec --service $s --task-definition cybersec-$s >/dev/null; done
+  ```
+  A segunda linha só vale se as revisões do backend e do frontend já tiverem a tag nova (`terraform apply` depois do `implantar.sh`).
+
 ## Observabilidade (T14, ADR-0037)
 
 A EC2 `cybersec-grafana` (t4g.small, subnet pública, IP privado `10.20.0.10`) roda em Docker Compose:
@@ -138,7 +166,7 @@ infra/scripts/grafana.sh         # túnel SSM: abra http://localhost:3000; Ctrl+
 
 ## Operação
 
-- **Deploy de uma nova versão:** feito pelo pipeline (T15). Os serviços ignoram mudanças de `task_definition` no Terraform para não desfazer o deploy do pipeline. Depois de mudar variáveis de ambiente pelo Terraform, rode `aws ecs update-service --cluster cybersec --service <s> --task-definition cybersec-<s>` (última revisão).
+- **Deploy de uma nova versão:** feito pelo pipeline (seção CI/CD). Os serviços ignoram mudanças de `task_definition` no Terraform para não desfazer o deploy do pipeline. Depois de mudar variáveis de ambiente pelo Terraform, rode `aws ecs update-service --cluster cybersec --service <s> --task-definition cybersec-<s>` (última revisão).
 - **Senhas das roles do banco:** incremente `versao_senhas_banco` em `segredos.tf`, rode `apply`, depois a task `cybersec-bootstrap` (que atualiza a senha das roles) e force o deploy de backend e frontend.
 - **Cabeçalho secreto de origem:** `terraform apply -replace=random_password.origem`.
 - **KEK:** a rotação ainda não recifra as DEKs antigas (THREAT_MODEL, T10). Não troque o segredo `cybersec/chaves-aplicacao` à mão. **HMAC_KEY e LOG_CHECKPOINT_KEY nunca mudam.**

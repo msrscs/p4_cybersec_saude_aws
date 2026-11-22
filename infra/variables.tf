@@ -69,7 +69,7 @@ variable "nome_banco" {
 # --- Aplicação ---------------------------------------------------------------------------
 
 variable "imagem_tag" {
-  description = "Tag das imagens no ECR (o pipeline usa o SHA do commit)."
+  description = "Tag inicial das imagens; depois o pipeline grava a tag em produção em /cybersec/imagem_tag."
   type        = string
   default     = "inicial"
 }
@@ -175,4 +175,28 @@ variable "email_alertas" {
   description = "E-mail que recebe alertas (rotinas com falha). null: sem assinatura."
   type        = string
   default     = null
+}
+
+# --- CI/CD (T15, ADR-0038) ---------------------------------------------------------------------
+
+variable "github_conectado" {
+  description = "true depois de concluir a conexão com o GitHub no console: cria webhook, checks dos PRs e pipeline."
+  type        = bool
+  default     = false
+}
+
+variable "github_repositorio" {
+  description = "Repositório (dono/nome) dos PRs e do pipeline."
+  type        = string
+  default     = "msrscs/p4_cybersec_saude_aws"
+}
+
+variable "github_atores_permitidos" {
+  description = "IDs numéricos do GitHub cujos PRs disparam o CodeBuild (gh api users/<login> --jq .id)."
+  type        = list(string)
+  default     = ["205552009"]
+  validation {
+    condition     = length(var.github_atores_permitidos) > 0 && alltrue([for a in var.github_atores_permitidos : can(regex("^[0-9]+$", a))])
+    error_message = "Informe ao menos um ID numérico do GitHub."
+  }
 }

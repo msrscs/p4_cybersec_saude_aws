@@ -1,0 +1,20 @@
+# Verificação da infraestrutura (T15, ADR-0038): Terraform com provider simulado (sem credenciais),
+# Checkov e o teste de redação da pilha de observabilidade (Docker). Roda nos PRs e no pipeline.
+version: 0.2
+
+env:
+  shell: bash
+
+phases:
+  install:
+    commands:
+      - source buildspecs/ferramentas.sh && instalar uv terraform checkov
+  build:
+    commands:
+      - cd infra
+      - terraform init -backend=false -input=false -no-color
+      - terraform fmt -check -recursive
+      - terraform validate -no-color
+      - terraform test -no-color
+      - checkov -d . --framework terraform --skip-path .terraform --compact --quiet
+      - cd .. && infra/observabilidade/testar_redacao.sh

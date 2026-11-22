@@ -1,0 +1,34 @@
+# Imagens do pipeline (T15, ADR-0038): build das 3 imagens com a tag do commit e push no ECR (tags
+# imutáveis, scan on push). Gera os imagedefinitions para o deploy ECS do backend e do frontend.
+# Variáveis do projeto: ECR_REGISTRO (conta.dkr.ecr.região.amazonaws.com), PREFIXO (cybersec).
+version: 0.2
+
+env:
+  shell: bash
+
+phases:
+  pre_build:
+    commands:
+      - TAG="${CODEBUILD_RESOLVED_SOURCE_VERSION:0:7}"
+      - '[[ "$TAG" =~ ^[0-9a-f]{7}$ ]] || { echo "commit inválido: $TAG" >&2; exit 1; }'
+      - aws ecr get-login-password | docker login --username AWS --password-stdin "$ECR_REGISTRO"
+  build:
+    commands:
+      - docker build -q -t "$ECR_REGISTRO/$PREFIXO/backend:$TAG" backend
+      - docker build -q -t "$ECR_REGISTRO/$PREFIXO/frontend:$TAG" frontend
+      - docker build -q -f db/Dockerfile -t "$ECR_REGISTRO/$PREFIXO/db:$TAG" .
+  post_build:
+    commands:
+      - for m in backend frontend db; do docker push -q "$ECR_REGISTRO/$PREFIXO/$m:$TAG"; done
+      - |
+        for m in backend frontend; do
+          printf '[{"name":"%s","imageUri":"%s"}]\n' "$m" "$ECR_REGISTRO/$PREFIXO/$m:$TAG" >"imagedefinitions-$m.json"
+        done
+      - echo "$TAG" >imagem_tag.txt
+      - docker logout "$ECR_REGISTRO"
+
+artifacts:
+  files:
+    - imagedefinitions-backend.json
+    - imagedefinitions-frontend.json
+    - imagem_tag.txt

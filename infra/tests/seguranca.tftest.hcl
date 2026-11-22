@@ -83,6 +83,18 @@ mock_provider "aws" {
   mock_data "aws_ssm_parameter" {
     defaults = { insecure_value = "ami-0123456789abcdef0" }
   }
+  mock_resource "aws_codestarconnections_connection" {
+    defaults = { arn = "arn:aws:codeconnections:us-east-1:111122223333:connection/mock" }
+  }
+  mock_resource "aws_codebuild_project" {
+    defaults = { arn = "arn:aws:codebuild:us-east-1:111122223333:project/mock" }
+  }
+  mock_resource "aws_ssm_parameter" {
+    defaults = { arn = "arn:aws:ssm:us-east-1:111122223333:parameter/cybersec/imagem_tag" }
+  }
+  mock_resource "aws_codepipeline" {
+    defaults = { arn = "arn:aws:codepipeline:us-east-1:111122223333:cybersec" }
+  }
 }
 
 mock_provider "aws" {
@@ -385,4 +397,92 @@ run "grafana_so_em_arm" {
     grafana_tipo_instancia = "t3.small"
   }
   expect_failures = [var.grafana_tipo_instancia]
+}
+
+# --- CI/CD (T15, ADR-0038) ---------------------------------------------------------------------
+
+run "cicd_antes_da_conexao" {
+  command = plan
+  variables {
+    github_conectado = false
+  }
+  assert {
+    condition     = length(aws_codepipeline.principal) == 0 && length(aws_codebuild_webhook.pr) == 0 && length(aws_codebuild_project.pr) == 0
+    error_message = "Sem a conexão concluída, nada que dependa do GitHub é criado."
+  }
+  assert {
+    condition     = strcontains(jsondecode(aws_ecs_task_definition.familia["backend"].container_definitions)[0].image, ":${var.imagem_tag}")
+    error_message = "As task definitions usam a tag do parâmetro /cybersec/imagem_tag."
+  }
+}
+
+run "cicd_menor_privilegio" {
+  command = apply
+  variables {
+    github_conectado = true
+  }
+
+  assert {
+    condition = length([
+      for a in flatten([for st in data.aws_iam_policy_document.codebuild["pr"].statement : st.actions]) : a
+      if can(regex("^(ecr|ecs|ssm|secretsmanager|iam|s3|kms|sts):", a))
+    ]) == 0
+    error_message = "O build dos PRs (código não revisado) não acessa ECR, ECS, SSM, segredos, IAM, S3 nem KMS."
+  }
+  assert {
+    condition = length([
+      for a in flatten([for st in data.aws_iam_policy_document.codebuild["verificacao"].statement : st.actions]) : a
+      if can(regex("^(ecr|ecs|ssm|secretsmanager|iam|sts):", a))
+    ]) == 0
+    error_message = "A verificação do pipeline não acessa ECR, ECS, SSM, segredos nem IAM."
+  }
+  assert {
+    condition = alltrue([
+      for doc in [data.aws_iam_policy_document.codebuild["implantacao"], data.aws_iam_policy_document.pipeline] :
+      length([for st in doc.statement : st if contains(st.actions, "iam:PassRole")]) == 1 && alltrue([
+        for st in doc.statement : !contains(st.actions, "iam:PassRole") || (
+          !contains(st.resources, "*") && one(st.condition).variable == "iam:PassedToService"
+          && toset(one(st.condition).values) == toset(["ecs-tasks.amazonaws.com"])
+        )
+      ])
+    ])
+    error_message = "iam:PassRole só em roles nomeadas (nunca *) e só para o ECS, na implantação e no pipeline."
+  }
+  assert {
+    condition = contains(
+      flatten([for g in aws_codebuild_webhook.pr[0].filter_group : [for f in g.filter : "${f.type}=${f.pattern}"]]),
+      "ACTOR_ACCOUNT_ID=^(205552009)$"
+    )
+    error_message = "O webhook dos PRs só aceita os atores permitidos."
+  }
+  assert {
+    condition     = aws_codebuild_webhook.pr[0].pull_request_build_policy[0].requires_comment_approval == "FORK_PULL_REQUESTS"
+    error_message = "PR de fork só roda com aprovação por comentário."
+  }
+  assert {
+    condition = [for st in aws_codepipeline.principal[0].stage : st.name] == [
+      "Fonte", "Verificacao", "Imagens", "Aprovacao", "Migrations", "DeployBackend", "DeployFrontend"
+    ]
+    error_message = "Aprovação manual antes das migrations e do deploy, nesta ordem."
+  }
+  assert {
+    condition     = alltrue([for a in aws_codepipeline.principal[0].artifact_store : one(a.encryption_key).type == "KMS"])
+    error_message = "Artefatos do pipeline cifrados com KMS."
+  }
+  assert {
+    condition     = one(one(aws_s3_bucket_server_side_encryption_configuration.artefatos.rule).apply_server_side_encryption_by_default).sse_algorithm == "aws:kms"
+    error_message = "Bucket de artefatos cifrado com KMS."
+  }
+  assert {
+    condition     = aws_s3_bucket_public_access_block.artefatos.block_public_policy && aws_s3_bucket_public_access_block.artefatos.restrict_public_buckets
+    error_message = "Bucket de artefatos sem acesso público."
+  }
+}
+
+run "cicd_ator_obrigatorio" {
+  command = plan
+  variables {
+    github_atores_permitidos = []
+  }
+  expect_failures = [var.github_atores_permitidos]
 }

@@ -46,3 +46,13 @@ output "otlp_endpoint" {
   description = "Endpoint OTLP/HTTP que as tasks recebem (null: telemetria desligada)."
   value       = local.otlp_endpoint
 }
+
+output "github_conexao" {
+  description = "Conexão com o GitHub: conclua no console (Developer Tools > Connections) e use github_conectado = true."
+  value       = { arn = aws_codestarconnections_connection.github.arn, status = aws_codestarconnections_connection.github.connection_status }
+}
+
+output "pipeline" {
+  description = "CodePipeline do deploy (null até github_conectado = true)."
+  value       = local.cicd_ativo ? "https://${var.regiao}.console.aws.amazon.com/codesuite/codepipeline/pipelines/${aws_codepipeline.principal[0].name}/view" : null
+}

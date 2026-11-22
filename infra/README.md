@@ -86,7 +86,7 @@ checkov -d . --framework terraform --skip-path .terraform   # 0 falhas; exceçõ
    aws ecs execute-command --cluster "$C" --task "$T" --container administracao --interactive --command "/bin/sh"
    # dentro da sessão:
    python -m scripts.criar_usuario --cpf ... --nome "..." --email ...    # senha por getpass
-   python -m scripts.atribuir_grupo --cpf ... --grupo Administrador
+   python -m scripts.atribuir_grupo --cpf ... --grupo Administrador   # digite CONFIRMAR quando pedir
    exit
    aws ecs stop-task --cluster "$C" --task "$T" >/dev/null
    ```

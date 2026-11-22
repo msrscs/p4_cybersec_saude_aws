@@ -99,8 +99,13 @@ checkov -d . --framework terraform --skip-path .terraform   # 0 falhas; exceçõ
 - **Senhas das roles do banco:** incremente `versao_senhas_banco` em `segredos.tf`, rode `apply`, depois a task `cybersec-bootstrap` (que atualiza a senha das roles) e force o deploy de backend e frontend.
 - **Cabeçalho secreto de origem:** `terraform apply -replace=random_password.origem`.
 - **KEK:** a rotação ainda não recifra as DEKs antigas (THREAT_MODEL, T10). Não troque o segredo `cybersec/chaves-aplicacao` à mão. **HMAC_KEY e LOG_CHECKPOINT_KEY nunca mudam.**
-- **Custo:** NAT, ALB, RDS, 4 tasks, WAF e CloudFront ficam ligados o tempo todo. Para pausar:
-  - zere os serviços pelo auto scaling (`aws application-autoscaling register-scalable-target --service-namespace ecs --scalable-dimension ecs:service:DesiredCount --resource-id service/cybersec/<s> --min-capacity 0 --max-capacity 0`);
-  - pare o RDS, que religa sozinho em 7 dias.
-
-  Para voltar, rode `terraform apply`.
+- **Custo:** NAT, ALB, RDS, 4 tasks, WAF e CloudFront ficam ligados o tempo todo. Para pausar e retomar o ECS e o RDS (ADR-0036):
+  ```bash
+  infra/scripts/ambiente.sh status
+  infra/scripts/ambiente.sh pausar    # rotinas -> serviços (0 tasks) -> RDS parado
+  infra/scripts/ambiente.sh retomar   # RDS -> serviços (2 tasks) -> rotinas
+  ```
+  - **Retomar** leva de 5 a 10 minutos, quase tudo esperando o RDS.
+  - **O RDS religa sozinho em 7 dias.** Se precisar, rode `pausar` de novo.
+  - **Com o ambiente pausado, não rode `terraform apply`**, porque ele religaria o auto scaling e as rotinas com o banco parado. Rode `retomar` antes. Enquanto estiver pausado, o `plan` mostra essa diferença.
+  - **Continuam cobrando:** NAT Gateway, ALB, WAF, KMS, Secrets Manager, logs e o armazenamento do RDS.

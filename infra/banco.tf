@@ -13,12 +13,14 @@ resource "aws_db_parameter_group" "principal" {
   description = "TLS obrigatorio (1.2+) e senhas SCRAM"
 
   parameter {
-    name  = "rds.force_ssl"
-    value = "1"
+    name         = "rds.force_ssl"
+    value        = "1"
+    apply_method = "pending-reboot" # estático: é como o RDS grava, sem diff permanente no plan
   }
   parameter {
-    name  = "ssl_min_protocol_version"
-    value = "TLSv1.2"
+    name         = "ssl_min_protocol_version"
+    value        = "TLSv1.2"
+    apply_method = "pending-reboot"
   }
   parameter {
     name  = "password_encryption"
@@ -72,7 +74,7 @@ resource "aws_db_instance" "principal" {
   multi_az               = var.rds_multi_az
   ca_cert_identifier     = "rds-ca-rsa2048-g1"
 
-  backup_retention_period   = 7
+  backup_retention_period   = var.rds_retencao_backup_dias
   backup_window             = "05:00-06:00" # 02h-03h em Brasília
   maintenance_window        = "sun:06:30-sun:07:30"
   copy_tags_to_snapshot     = true

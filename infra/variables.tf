@@ -44,6 +44,16 @@ variable "rds_multi_az" {
   default     = false
 }
 
+variable "rds_retencao_backup_dias" {
+  description = "Dias de retenção dos backups automáticos do RDS. O plano gratuito da AWS só aceita 1 (ADR-0034)."
+  type        = number
+  default     = 7
+  validation {
+    condition     = var.rds_retencao_backup_dias >= 1 && var.rds_retencao_backup_dias <= 35
+    error_message = "Use de 1 a 35 dias; 0 desligaria os backups automáticos."
+  }
+}
+
 variable "rds_armazenamento_gb" {
   description = "Armazenamento inicial (gp3); cresce sozinho até 5x."
   type        = number

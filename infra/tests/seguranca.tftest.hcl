@@ -403,6 +403,9 @@ run "grafana_so_em_arm" {
 
 run "cicd_antes_da_conexao" {
   command = plan
+  variables {
+    github_conectado = false
+  }
   assert {
     condition     = length(aws_codepipeline.principal) == 0 && length(aws_codebuild_webhook.pr) == 0 && length(aws_codebuild_project.pr) == 0
     error_message = "Sem a conexão concluída, nada que dependa do GitHub é criado."

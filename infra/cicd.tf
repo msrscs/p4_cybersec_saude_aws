@@ -177,8 +177,11 @@ data "aws_iam_policy_document" "codebuild" {
   dynamic "statement" {
     for_each = each.key == "pr" ? [1] : []
     content {
-      sid       = "Conexao"
-      actions   = ["codeconnections:UseConnection", "codeconnections:GetConnectionToken", "codestar-connections:UseConnection"]
+      sid = "Conexao"
+      # A conexão tem ARN com o prefixo antigo (codestar-connections): as duas formas são avaliadas.
+      actions = flatten([for p in ["codeconnections", "codestar-connections"] : [
+        "${p}:GetConnection", "${p}:GetConnectionToken", "${p}:UseConnection"
+      ]])
       resources = [aws_codestarconnections_connection.github.arn]
     }
   }

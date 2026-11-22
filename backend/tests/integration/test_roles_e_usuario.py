@@ -1,11 +1,13 @@
 """THREAT_MODEL E3 (menor privilégio) e estrutura da tabela usuario (RF-01)."""
 
 import os
+import secrets
 
 import psycopg
 import pytest
-from psycopg import errors
+from psycopg import errors, sql
 
+from app.core.db_url import APP_DB_ROLE, MIGRATOR_DB_ROLE
 from scripts.bootstrap_db import bootstrap
 
 from .conftest import BancoTeste, superuser_connect
@@ -77,3 +79,62 @@ def test_bootstrap_e_idempotente(test_db: BancoTeste) -> None:
 def test_bootstrap_recusa_superusuario_com_nome_de_role_da_aplicacao(migrator_conn: Conn) -> None:
     with pytest.raises(RuntimeError, match="mesmo nome"):
         bootstrap(migrator_conn, database="qualquer", app_password="x", migrator_password="y")
+
+
+def test_bootstrap_com_mestre_nao_superusuario_como_no_rds(test_db: BancoTeste) -> None:
+    """O mestre do RDS tem CREATEROLE/CREATEDB, mas não é superusuário (ADR-0034)."""
+    mestre, senha = f"cs_mestre_{secrets.token_hex(4)}", secrets.token_hex(16)
+    banco = f"cs_test_{secrets.token_hex(4)}"
+    papeis = sql.SQL(", ").join(map(sql.Identifier, (MIGRATOR_DB_ROLE, APP_DB_ROLE)))
+    with superuser_connect(test_db.name, test_db.host, test_db.port) as su:
+        su.execute(
+            sql.SQL("CREATE ROLE {} LOGIN CREATEROLE CREATEDB PASSWORD {}").format(
+                sql.Identifier(mestre), sql.Literal(senha)
+            )
+        )
+        # Estado de quem criou as roles: ADMIN, sem SET (padrão do PostgreSQL 16+).
+        su.execute(
+            sql.SQL("GRANT {} TO {} WITH ADMIN TRUE, INHERIT FALSE, SET FALSE").format(
+                papeis, sql.Identifier(mestre)
+            )
+        )
+        su.execute(
+            sql.SQL("CREATE DATABASE {} OWNER {}").format(
+                sql.Identifier(banco), sql.Identifier(mestre)
+            )
+        )
+    try:
+        alvo = BancoTeste(name=banco, host=test_db.host, port=test_db.port)
+        with alvo.connect(mestre, senha) as conn:
+            for _ in range(2):  # a segunda execução passa pelo ALTER ROLE (idempotência)
+                bootstrap(
+                    conn,
+                    database=banco,
+                    app_password=os.environ["APP_DB_PASSWORD"],
+                    migrator_password=os.environ["MIGRATOR_DB_PASSWORD"],
+                )
+            dono = conn.execute(
+                "SELECT pg_get_userbyid(nspowner) FROM pg_namespace WHERE nspname = 'app'"
+            ).fetchone()
+        assert dono == (MIGRATOR_DB_ROLE,)
+    finally:
+        with superuser_connect(test_db.name, test_db.host, test_db.port) as su:
+            su.execute(
+                sql.SQL("DROP DATABASE IF EXISTS {} WITH (FORCE)").format(sql.Identifier(banco))
+            )
+            su.execute(sql.SQL("DROP ROLE IF EXISTS {}").format(sql.Identifier(mestre)))
+
+
+def test_bootstrap_recusa_role_com_atributo_privilegiado(test_db: BancoTeste) -> None:
+    with superuser_connect(test_db.name, test_db.host, test_db.port) as su:
+        su.execute(sql.SQL("ALTER ROLE {} BYPASSRLS").format(sql.Identifier(APP_DB_ROLE)))
+        try:
+            with pytest.raises(RuntimeError, match="BYPASSRLS"):
+                bootstrap(
+                    su,
+                    database=test_db.name,
+                    app_password=os.environ["APP_DB_PASSWORD"],
+                    migrator_password=os.environ["MIGRATOR_DB_PASSWORD"],
+                )
+        finally:
+            su.execute(sql.SQL("ALTER ROLE {} NOBYPASSRLS").format(sql.Identifier(APP_DB_ROLE)))

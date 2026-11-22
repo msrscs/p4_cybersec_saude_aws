@@ -71,6 +71,11 @@ checkov -d . --framework terraform --skip-path .terraform   # 0 falhas; exceçõ
      --overrides '{"containerOverrides":[{"name":"administracao","command":["python","-m","scripts.importar_cid"]}]}')
    aws ecs wait tasks-stopped --cluster "$C" --tasks "$T"
    aws ecs describe-tasks --cluster "$C" --tasks "$T" --query 'tasks[0].containers[0].exitCode'   # 0
+   # Cadastros de catálogo (db/seeds/cadastros.json, ADR-0035), depois do CID:
+   T=$(rodar --task-definition cybersec-administracao \
+     --overrides '{"containerOverrides":[{"name":"administracao","command":["python","-m","scripts.importar_cadastros"]}]}')
+   aws ecs wait tasks-stopped --cluster "$C" --tasks "$T"
+   aws ecs describe-tasks --cluster "$C" --tasks "$T" --query 'tasks[0].containers[0].exitCode'   # 0
    for s in backend frontend; do aws ecs update-service --cluster "$C" --service $s --force-new-deployment >/dev/null; done
    ```
    Uma task de banco ou de rotina que termina com erro gera alerta no SNS. Os logs ficam em `/ecs/cybersec/<família>`.
@@ -81,7 +86,7 @@ checkov -d . --framework terraform --skip-path .terraform   # 0 falhas; exceçõ
    aws ecs execute-command --cluster "$C" --task "$T" --container administracao --interactive --command "/bin/sh"
    # dentro da sessão:
    python -m scripts.criar_usuario --cpf ... --nome "..." --email ...    # senha por getpass
-   python -m scripts.atribuir_grupo --cpf ... --grupo Administrador
+   python -m scripts.atribuir_grupo --cpf ... --grupo Administrador   # digite CONFIRMAR quando pedir
    exit
    aws ecs stop-task --cluster "$C" --task "$T" >/dev/null
    ```
@@ -94,8 +99,13 @@ checkov -d . --framework terraform --skip-path .terraform   # 0 falhas; exceçõ
 - **Senhas das roles do banco:** incremente `versao_senhas_banco` em `segredos.tf`, rode `apply`, depois a task `cybersec-bootstrap` (que atualiza a senha das roles) e force o deploy de backend e frontend.
 - **Cabeçalho secreto de origem:** `terraform apply -replace=random_password.origem`.
 - **KEK:** a rotação ainda não recifra as DEKs antigas (THREAT_MODEL, T10). Não troque o segredo `cybersec/chaves-aplicacao` à mão. **HMAC_KEY e LOG_CHECKPOINT_KEY nunca mudam.**
-- **Custo:** NAT, ALB, RDS, 4 tasks, WAF e CloudFront ficam ligados o tempo todo. Para pausar:
-  - zere os serviços pelo auto scaling (`aws application-autoscaling register-scalable-target --service-namespace ecs --scalable-dimension ecs:service:DesiredCount --resource-id service/cybersec/<s> --min-capacity 0 --max-capacity 0`);
-  - pare o RDS, que religa sozinho em 7 dias.
-
-  Para voltar, rode `terraform apply`.
+- **Custo:** NAT, ALB, RDS, 4 tasks, WAF e CloudFront ficam ligados o tempo todo. Para pausar e retomar o ECS e o RDS (ADR-0036):
+  ```bash
+  infra/scripts/ambiente.sh status
+  infra/scripts/ambiente.sh pausar    # rotinas -> serviços (0 tasks) -> RDS parado
+  infra/scripts/ambiente.sh retomar   # RDS -> serviços (2 tasks) -> rotinas
+  ```
+  - **Retomar** leva de 5 a 10 minutos, quase tudo esperando o RDS.
+  - **O RDS religa sozinho em 7 dias.** Se precisar, rode `pausar` de novo.
+  - **Com o ambiente pausado, não rode `terraform apply`**, porque ele religaria o auto scaling e as rotinas com o banco parado. Rode `retomar` antes. Enquanto estiver pausado, o `plan` mostra essa diferença.
+  - **Continuam cobrando:** NAT Gateway, ALB, WAF, KMS, Secrets Manager, logs e o armazenamento do RDS.

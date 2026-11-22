@@ -1,0 +1,292 @@
+{
+  "versao": 1,
+  "tipos_unidade": [
+    {
+      "nome": "Clínica",
+      "descricao": "",
+      "status": "ativo"
+    },
+    {
+      "nome": "CyberSec",
+      "descricao": "Desenvolvedor do software",
+      "status": "ativo"
+    },
+    {
+      "nome": "Hospital",
+      "descricao": "",
+      "status": "ativo"
+    },
+    {
+      "nome": "Laboratório",
+      "descricao": "",
+      "status": "ativo"
+    },
+    {
+      "nome": "Posto de Saúde",
+      "descricao": "",
+      "status": "ativo"
+    },
+    {
+      "nome": "Secretaria de Saúde",
+      "descricao": "",
+      "status": "ativo"
+    }
+  ],
+  "servicos": [
+    {
+      "nome": "Consulta Oncológica",
+      "descricao": "",
+      "status": "ativo",
+      "cids": [
+        "C50",
+        "D05",
+        "D24"
+      ]
+    },
+    {
+      "nome": "Consulta Ortopédica",
+      "descricao": "",
+      "status": "ativo",
+      "cids": [
+        "S02",
+        "S22"
+      ]
+    },
+    {
+      "nome": "Exame de Sangue",
+      "descricao": "",
+      "status": "ativo",
+      "cids": []
+    },
+    {
+      "nome": "Exame Mamografia",
+      "descricao": "",
+      "status": "ativo",
+      "cids": []
+    },
+    {
+      "nome": "Exame Radiografia",
+      "descricao": "",
+      "status": "ativo",
+      "cids": [
+        "M80",
+        "M81",
+        "S02",
+        "S12",
+        "S22"
+      ]
+    }
+  ],
+  "unidades": [
+    {
+      "nome": "CyberSec",
+      "tipo": "CyberSec",
+      "endereco": "Avenida Cais do Apolo, 77",
+      "telefone": "8134196700",
+      "status": "ativo",
+      "servicos": []
+    },
+    {
+      "nome": "Hospital da Mulher do Recife (HMR)",
+      "tipo": "Hospital",
+      "endereco": "BR-101, Sul. 485 - Curado, Recife - PE",
+      "telefone": "8120110100",
+      "status": "ativo",
+      "servicos": [
+        "Consulta Oncológica",
+        "Exame Mamografia"
+      ]
+    },
+    {
+      "nome": "Hospital de Câncer de Pernambuco",
+      "tipo": "Hospital",
+      "endereco": "Av. Cruz Cabugá, 1597 - Santo Amaro, Recife - PE",
+      "telefone": "8132178000",
+      "status": "ativo",
+      "servicos": [
+        "Consulta Oncológica",
+        "Exame de Sangue",
+        "Exame Mamografia"
+      ]
+    },
+    {
+      "nome": "Hospital de Pediatria Helena Moura",
+      "tipo": "Hospital",
+      "endereco": "R. Cônego Barata, s/n - Tamarineira, Recife - PE",
+      "telefone": "8133551322",
+      "status": "ativo",
+      "servicos": []
+    },
+    {
+      "nome": "IMIP Instituto de Medicina Integral Professor Fernando Figueira",
+      "tipo": "Hospital",
+      "endereco": "R. dos Coelhos, 300 - Boa Vista, Recife - PE",
+      "telefone": "8121224100",
+      "status": "ativo",
+      "servicos": [
+        "Consulta Oncológica",
+        "Exame de Sangue",
+        "Exame Mamografia"
+      ]
+    },
+    {
+      "nome": "Laboratório Municipal de Saúde Pública",
+      "tipo": "Laboratório",
+      "endereco": "R. Maj. Codeceira, 194 - Santo Amaro, Recife - PE",
+      "telefone": "8133552022",
+      "status": "ativo",
+      "servicos": []
+    },
+    {
+      "nome": "Policlínica Clementino Fraga",
+      "tipo": "Clínica",
+      "endereco": "R. Japaratuba, 260 - Vasco da Gama, Recife - PE",
+      "telefone": "8133556049",
+      "status": "ativo",
+      "servicos": []
+    },
+    {
+      "nome": "Policlínica e Maternidade Professor Arnaldo Marques",
+      "tipo": "Clínica",
+      "endereco": "Av. Dois Rios, s/n - Ibura, Recife - PE",
+      "telefone": null,
+      "status": "ativo",
+      "servicos": []
+    },
+    {
+      "nome": "Policlínica e Maternidade Professor Barros Lima",
+      "tipo": "Clínica",
+      "endereco": "Av. Norte Miguel Arraes de Alencar, 6465 - Casa Amarela, Recife - PE",
+      "telefone": "8133552160",
+      "status": "ativo",
+      "servicos": []
+    },
+    {
+      "nome": "Policlínica Lessa de Andrade",
+      "tipo": "Clínica",
+      "endereco": "Estr. dos Remédios, 2416 - Madalena, Recife - PE",
+      "telefone": "8133557805",
+      "status": "ativo",
+      "servicos": [
+        "Consulta Ortopédica",
+        "Exame Radiografia"
+      ]
+    },
+    {
+      "nome": "Posto de Saúde Jader de Andrade - Comunidade Entra Apulso",
+      "tipo": "Posto de Saúde",
+      "endereco": "Rua Cel. Anizío Rodrigues Coelho, 35, Boa Viagem, Recife - PE",
+      "telefone": null,
+      "status": "ativo",
+      "servicos": []
+    },
+    {
+      "nome": "SESAU",
+      "tipo": "Secretaria de Saúde",
+      "endereco": "Rua do Veiga, 268 - Santo Amaro, Recife - PE",
+      "telefone": "8133346710",
+      "status": "ativo",
+      "servicos": []
+    },
+    {
+      "nome": "Unidade de Saúde da Família (USF)",
+      "tipo": "Posto de Saúde",
+      "endereco": "Recife - PE",
+      "telefone": null,
+      "status": "ativo",
+      "servicos": []
+    }
+  ],
+  "tipos_oci": [
+    {
+      "tipo_oci": "Cardiologia",
+      "prazo_diagnostico": 60,
+      "status": "ativo",
+      "cids": [
+        "C38",
+        "I00",
+        "I21",
+        "I22",
+        "I23"
+      ]
+    },
+    {
+      "tipo_oci": "Neurologia",
+      "prazo_diagnostico": 45,
+      "status": "ativo",
+      "cids": [
+        "Q01"
+      ]
+    },
+    {
+      "tipo_oci": "Oncologia",
+      "prazo_diagnostico": 30,
+      "status": "ativo",
+      "cids": [
+        "C50",
+        "D05",
+        "N61"
+      ]
+    },
+    {
+      "tipo_oci": "Ortopedia",
+      "prazo_diagnostico": 60,
+      "status": "ativo",
+      "cids": [
+        "S22"
+      ]
+    }
+  ],
+  "agendas": [
+    {
+      "unidade": "IMIP Instituto de Medicina Integral Professor Fernando Figueira",
+      "servico": "Consulta Oncológica",
+      "dia_semana": 0,
+      "hora_inicio": "07:00:00",
+      "hora_fim": "18:00:00",
+      "duracao_minutos": 15,
+      "vagas_por_horario": 10,
+      "status": "ativo"
+    },
+    {
+      "unidade": "IMIP Instituto de Medicina Integral Professor Fernando Figueira",
+      "servico": "Consulta Oncológica",
+      "dia_semana": 3,
+      "hora_inicio": "07:00:00",
+      "hora_fim": "18:00:00",
+      "duracao_minutos": 15,
+      "vagas_por_horario": 10,
+      "status": "ativo"
+    },
+    {
+      "unidade": "IMIP Instituto de Medicina Integral Professor Fernando Figueira",
+      "servico": "Exame Mamografia",
+      "dia_semana": 0,
+      "hora_inicio": "07:00:00",
+      "hora_fim": "18:00:00",
+      "duracao_minutos": 20,
+      "vagas_por_horario": 10,
+      "status": "ativo"
+    },
+    {
+      "unidade": "Policlínica Lessa de Andrade",
+      "servico": "Consulta Ortopédica",
+      "dia_semana": 4,
+      "hora_inicio": "08:00:00",
+      "hora_fim": "12:00:00",
+      "duracao_minutos": 30,
+      "vagas_por_horario": 2,
+      "status": "ativo"
+    },
+    {
+      "unidade": "Policlínica Lessa de Andrade",
+      "servico": "Exame Radiografia",
+      "dia_semana": 0,
+      "hora_inicio": "10:00:00",
+      "hora_fim": "11:00:00",
+      "duracao_minutos": 10,
+      "vagas_por_horario": 1,
+      "status": "ativo"
+    }
+  ]
+}

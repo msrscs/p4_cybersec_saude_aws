@@ -101,8 +101,10 @@ mock_provider "aws" {
   }
 }
 
+# O terraform test também lê o terraform.tfvars local; fixa os valores que os asserts verificam.
 variables {
-  email_alertas = null
+  email_alertas            = null
+  rds_retencao_backup_dias = 7
 }
 
 run "padrao_seguro" {
@@ -142,6 +144,10 @@ run "padrao_seguro" {
   assert {
     condition     = aws_db_instance.principal.manage_master_user_password && aws_db_instance.principal.deletion_protection
     error_message = "Senha mestre gerenciada pelo RDS e proteção contra exclusão."
+  }
+  assert {
+    condition     = aws_db_instance.principal.backup_retention_period == 7
+    error_message = "Padrão: backups automáticos por 7 dias."
   }
   assert {
     condition     = !contains(["app_user", "migrator"], aws_db_instance.principal.username)
@@ -285,4 +291,23 @@ run "minimo_de_duas_tasks" {
     tasks_minimas = 1
   }
   expect_failures = [var.tasks_minimas]
+}
+
+run "backup_no_plano_gratuito" {
+  command = plan
+  variables {
+    rds_retencao_backup_dias = 1
+  }
+  assert {
+    condition     = aws_db_instance.principal.backup_retention_period == 1
+    error_message = "A retenção do backup segue a variável (plano gratuito, ADR-0034)."
+  }
+}
+
+run "backup_nunca_desligado" {
+  command = plan
+  variables {
+    rds_retencao_backup_dias = 0
+  }
+  expect_failures = [var.rds_retencao_backup_dias]
 }

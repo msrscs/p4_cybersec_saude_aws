@@ -113,9 +113,13 @@ locals {
         mountPoints            = [{ sourceVolume = "tmp", containerPath = "/tmp", readOnly = false }]
         linuxParameters = {
           initProcessEnabled = true
-          capabilities       = { drop = ["ALL"] }
+          capabilities       = { add = [], drop = ["ALL"] }
         }
-        stopTimeout = 30
+        # Campos que o ECS devolve preenchidos; declarados para o plan não acusar diferença.
+        portMappings   = []
+        systemControls = []
+        volumesFrom    = []
+        stopTimeout    = 30
         logConfiguration = {
           logDriver = "awslogs"
           options = {
@@ -127,7 +131,7 @@ locals {
       },
       f.comando == null ? {} : { command = f.comando },
       f.porta == null ? {} : {
-        portMappings = [merge(f.porta, { protocol = "tcp", appProtocol = "http" })]
+        portMappings = [merge(f.porta, { hostPort = f.porta.containerPort, protocol = "tcp", appProtocol = "http" })]
       },
       # O ECS ignora o HEALTHCHECK do Dockerfile; precisa estar aqui (ADR-0029).
       f.saude == null ? {} : {

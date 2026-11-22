@@ -19,18 +19,29 @@ from psycopg.conninfo import make_conninfo
 from app.core.db_url import APP_DB_ROLE, MIGRATOR_DB_ROLE, tls_do_ambiente
 
 SCHEMA = "app"
-_ROLE_ATTRS = "LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS"
+_ATTRS_COMUNS = "LOGIN NOCREATEDB NOCREATEROLE NOINHERIT"
+_ATTRS_CRIACAO = _ATTRS_COMUNS + " NOSUPERUSER NOREPLICATION NOBYPASSRLS"
 
 
 def _upsert_role(cur: psycopg.Cursor[tuple[object, ...]], role: str, password: str) -> None:
     cur.execute("SELECT 1 FROM pg_roles WHERE rolname = %s", (role,))
-    verb = "ALTER" if cur.fetchone() else "CREATE"
+    existe = cur.fetchone() is not None
+    # No ALTER, só superusuário pode citar SUPERUSER/REPLICATION/BYPASSRLS, mesmo para desligar.
+    # O usuário mestre do RDS não é superusuário: esses três são verificados em vez de reaplicados.
+    verb, attrs = ("ALTER", _ATTRS_COMUNS) if existe else ("CREATE", _ATTRS_CRIACAO)
     # Utilitário DDL não aceita parâmetro: a senha entra como literal escapado pelo psycopg.
     cur.execute(
-        sql.SQL("{verb} ROLE {role} " + _ROLE_ATTRS + " PASSWORD {pw}").format(
+        sql.SQL("{verb} ROLE {role} " + attrs + " PASSWORD {pw}").format(
             verb=sql.SQL(verb), role=sql.Identifier(role), pw=sql.Literal(password)
         )
     )
+    cur.execute(
+        "SELECT rolsuper OR rolreplication OR rolbypassrls FROM pg_roles WHERE rolname = %s",
+        (role,),
+    )
+    row = cur.fetchone()
+    if row is None or row[0]:
+        raise RuntimeError(f"A role {role} tem SUPERUSER, REPLICATION ou BYPASSRLS; corrija antes.")
 
 
 def bootstrap(
@@ -59,11 +70,12 @@ def bootstrap(
                 db=db, mig=mig, app=app
             ),
             sql.SQL("REVOKE ALL ON SCHEMA public FROM PUBLIC").format(),
+            # Criar o schema com dono migrator exige poder assumi-la (SET ROLE). Superusuário já
+            # pode; o mestre do RDS só recebe ADMIN sobre as roles que cria (PostgreSQL 16+).
+            sql.SQL("GRANT {mig} TO CURRENT_USER WITH INHERIT FALSE, SET TRUE").format(mig=mig),
             sql.SQL("CREATE SCHEMA IF NOT EXISTS {s} AUTHORIZATION {mig}").format(
                 s=schema, mig=mig
             ),
-            sql.SQL("REVOKE ALL ON SCHEMA {s} FROM PUBLIC").format(s=schema),
-            sql.SQL("GRANT USAGE ON SCHEMA {s} TO {app}").format(s=schema, app=app),
             sql.SQL("ALTER ROLE {r} IN DATABASE {db} SET search_path = {s}").format(
                 r=mig, db=db, s=schema
             ),
@@ -73,6 +85,14 @@ def bootstrap(
         ]
         for stmt in statements:
             cur.execute(stmt)
+        # Privilégios do schema só pelo dono: sem superusuário (RDS), assume a migrator só aqui,
+        # em vez de herdar os privilégios dela permanentemente (INHERIT).
+        cur.execute(sql.SQL("SET ROLE {mig}").format(mig=mig))
+        try:
+            cur.execute(sql.SQL("REVOKE ALL ON SCHEMA {s} FROM PUBLIC").format(s=schema))
+            cur.execute(sql.SQL("GRANT USAGE ON SCHEMA {s} TO {app}").format(s=schema, app=app))
+        finally:
+            cur.execute("RESET ROLE")
 
 
 def _require(name: str) -> str:

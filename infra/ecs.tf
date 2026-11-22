@@ -105,7 +105,7 @@ locals {
     for nome, f in local.familias : nome => merge(
       {
         name                   = nome
-        image                  = "${local.url_repo[f.repo]}:${var.imagem_tag}"
+        image                  = "${local.url_repo[f.repo]}:${aws_ssm_parameter.imagem_tag.insecure_value}"
         essential              = true
         environment            = f.env
         secrets                = [for s in f.segredos : { name = s, valueFrom = local.segredo[s] }]

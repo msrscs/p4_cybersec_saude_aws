@@ -1,0 +1,11 @@
+# Lote dos PRs e da etapa de verificação do pipeline (T15, ADR-0038): aplicação e infraestrutura em
+# paralelo. Qualquer build com falha reprova o lote, e o GitHub mostra o check vermelho.
+version: 0.2
+
+batch:
+  fast-fail: false
+  build-list:
+    - identifier: aplicacao
+      buildspec: buildspecs/seguranca.yml
+    - identifier: infraestrutura
+      buildspec: buildspecs/observabilidade.yml

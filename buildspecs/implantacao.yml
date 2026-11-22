@@ -1,0 +1,15 @@
+# Migrations do pipeline (T15, ADR-0038), depois da aprovação manual: novas revisões das tasks de
+# banco e das rotinas com a imagem do commit, a task de migration (espera terminar com sucesso) e a
+# tag gravada em /cybersec/imagem_tag (o Terraform passa a usar a mesma). O deploy do backend e do
+# frontend vem nas etapas seguintes (ECS, com circuit breaker e rollback).
+# Variáveis do projeto: CLUSTER, REDE_TASKS_BANCO, ECR_REGISTRO, PREFIXO, PARAMETRO_TAG.
+version: 0.2
+
+env:
+  shell: bash
+
+phases:
+  build:
+    commands:
+      - TAG="$(cat "$CODEBUILD_SRC_DIR_Imagens/imagem_tag.txt")"
+      - infra/scripts/implantar.sh "$TAG"

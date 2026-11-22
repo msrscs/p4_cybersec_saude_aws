@@ -1,0 +1,60 @@
+# Verificação da aplicação (T15, ADR-0038): o mesmo do antigo .github/workflows/ci.yml.
+# Roda nos PRs (cybersec-pr) e no pipeline (cybersec-verificacao), em modo privilegiado (Postgres e
+# imagens em Docker), sem nenhum segredo ou permissão na conta: senhas e chaves são aleatórias por
+# execução e nunca impressas.
+version: 0.2
+
+env:
+  shell: bash
+  variables:
+    POSTGRES_USER: cs_admin
+    # Banco efêmero do build, destruído ao fim; não é segredo de nenhum ambiente.
+    POSTGRES_PASSWORD: ci-efemero
+    POSTGRES_DB: postgres
+    DB_HOST: localhost
+    DB_PORT: "5432"
+    DB_SSLMODE: verify-full
+    REQUIRE_DB_TESTS: "1"
+
+phases:
+  install:
+    commands:
+      - source buildspecs/ferramentas.sh && instalar uv node gitleaks
+      - export DB_SSLROOTCERT="$CODEBUILD_SRC_DIR/.db-ca.crt"
+  pre_build:
+    commands:
+      - db/postgres/subir_ci.sh
+      # Senhas das roles e chaves da aplicação só desta execução (nunca impressas).
+      - export APP_DB_PASSWORD="$(openssl rand -hex 24)" MIGRATOR_DB_PASSWORD="$(openssl rand -hex 24)"
+      - export KEK_KEYRING="1:$(openssl rand -base64 32)" KEK_ATIVA=1 HMAC_KEY="$(openssl rand -base64 32)"
+  build:
+    commands:
+      - echo "== Segredos no repositório (gitleaks)"
+      - if [ -d .git ]; then gitleaks git --redact --no-banner .; else gitleaks dir --redact --no-banner .; fi
+      - echo "== Backend"
+      - cd backend && uv sync --locked
+      - uv run ruff check . ../db
+      - uv run ruff format --check . ../db
+      - uv run mypy .
+      - uv run bandit -r app scripts
+      - uv run pytest
+      - echo "== Cobertura mínima nos módulos críticos (cripto)" && uv run coverage report --include="app/core/crypto.py" --fail-under=95
+      - echo "== Cobertura mínima nos módulos críticos (auth)" && uv run coverage report --fail-under=90 --include="app/core/senha.py,app/core/cpf.py,app/core/totp.py,app/services/auth.py,app/services/usuario.py,app/services/mfa.py,app/services/sessao.py,app/services/gestao_usuario.py,app/api/auth.py,app/api/mfa.py,app/api/usuarios.py,app/api/deps.py,app/schemas/gestao_usuario.py"
+      - echo "== Cobertura mínima nos módulos críticos (auditoria)" && uv run coverage report --fail-under=95 --include="app/core/cadeia.py,app/services/cadeia_log.py,app/services/auditoria.py,app/services/consulta_log.py,app/repositories/log.py,app/api/logs.py,app/schemas/log.py"
+      - echo "== Cobertura mínima nos módulos críticos (RBAC e pacientes)" && uv run coverage report --fail-under=90 --include="app/services/autorizacao.py,app/services/paciente.py,app/repositories/rbac.py,app/repositories/paciente.py,app/api/pacientes.py,app/schemas/paciente.py,app/api/deps.py"
+      - echo "== Cobertura mínima nos módulos críticos (hardening)" && uv run coverage report --fail-under=90 --include="app/services/limite.py,app/repositories/limite.py,app/services/manutencao.py,app/core/headers.py,app/core/db_url.py"
+      - echo "== Cobertura mínima nos módulos críticos (OCI)" && uv run coverage report --fail-under=90 --include="app/services/oci.py,app/repositories/oci.py,app/api/ocis.py,app/schemas/oci.py,app/services/agenda.py,app/repositories/agenda.py,app/services/dashboard_oci.py,app/repositories/dashboard_oci.py"
+      - echo "== Cobertura mínima nos módulos críticos (cadastros)" && uv run coverage report --fail-under=90 --include="app/services/cadastro.py,app/repositories/cadastro.py,app/api/cadastros.py,app/schemas/cadastro.py"
+      - uv run pip-audit
+      - cd ../frontend && echo "== Frontend"
+      - npm ci --ignore-scripts
+      - npm run lint
+      - npm test
+      - npm audit --audit-level=high
+      - echo "== Ponta a ponta (Playwright)"
+      - npx playwright install --with-deps chromium
+      - cd ../backend && REQUIRE_DB_TESTS= LOG_CHECKPOINT_KEY="$(openssl rand -base64 32)" uv run python -m tests.e2e_ambiente
+      - cd .. && echo "== Imagens (build, sem push)"
+      - docker build -q -t cybersec-saude-backend:ci backend
+      - docker build -q -t cybersec-saude-frontend:ci frontend
+      - docker build -q -f db/Dockerfile -t cybersec-saude-db:ci .

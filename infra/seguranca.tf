@@ -134,4 +134,4 @@ resource "aws_vpc_security_group_egress_rule" "https_aws" {
   to_port           = 443
 }
 
-# A saída OTLP (4318) para o Collector é criada na T14, referenciando o SG da EC2 do Grafana.
+# A saída OTLP (4318) para o Collector fica em observabilidade.tf, junto do SG da EC2 do Grafana.

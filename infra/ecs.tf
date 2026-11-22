@@ -40,8 +40,8 @@ locals {
     { name = "DB_SSLMODE", value = "verify-full" },
     { name = "DB_SSLROOTCERT", value = local.ca_rds },
   ]
-  env_otel = var.otlp_endpoint == null ? [] : [
-    { name = "OTEL_EXPORTER_OTLP_ENDPOINT", value = var.otlp_endpoint },
+  env_otel = local.otlp_endpoint == null ? [] : [
+    { name = "OTEL_EXPORTER_OTLP_ENDPOINT", value = local.otlp_endpoint },
   ]
 
   familias = {

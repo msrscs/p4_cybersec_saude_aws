@@ -1,0 +1,69 @@
+#!/bin/bash
+# Inicialização da EC2 do Grafana (T14, ADR-0037). Gerado por infra/observabilidade.tf; mudar este
+# arquivo ou a pilha recria a instância (user_data_replace_on_change).
+set -euo pipefail
+umask 027
+DIR=/opt/observabilidade
+
+# --- Sem SSH: o acesso é só pelo SSM (o SG também não abre a 22) -----------------------------
+systemctl disable --now sshd.service sshd.socket 2>/dev/null || true
+
+# --- Docker e plugin Compose (versão fixa, hash conferido) -----------------------------------
+dnf install -y docker
+systemctl enable --now docker
+install -d -m 755 /usr/local/lib/docker/cli-plugins
+curl -fsSL -o /tmp/docker-compose \
+  "https://github.com/docker/compose/releases/download/${compose_versao}/docker-compose-linux-aarch64"
+echo "${compose_sha256}  /tmp/docker-compose" | sha256sum -c -
+install -m 755 /tmp/docker-compose /usr/local/lib/docker/cli-plugins/docker-compose
+rm -f /tmp/docker-compose
+
+# --- Swap de 1 GB: folga para picos dos 5 serviços em 2 GB de RAM ------------------------------
+if [ ! -f /swapfile ]; then
+  fallocate -l 1G /swapfile && chmod 600 /swapfile && mkswap /swapfile
+  echo '/swapfile none swap sw 0 0' >>/etc/fstab
+fi
+swapon -a
+
+# --- Arquivos da pilha (conteúdo literal de infra/observabilidade/) ---------------------------
+install -d -m 750 "$DIR" "$DIR/segredos"
+%{ for caminho, conteudo in arquivos ~}
+install -d -m 755 "$(dirname "$DIR/${caminho}")"
+cat >"$DIR/${caminho}" <<'FIM_DO_ARQUIVO'
+${conteudo}
+FIM_DO_ARQUIVO
+chmod 644 "$DIR/${caminho}"
+%{ endfor ~}
+
+cat >"$DIR/.env" <<EOF
+OTLP_ESCUTA=${ip_privado}:4318
+AWS_REGION=${regiao}
+GRUPOS_DE_LOG=${grupos_de_log}
+EOF
+
+# Senha do admin do Grafana: só o usuário do container (472) lê.
+aws secretsmanager get-secret-value --region "${regiao}" --secret-id "${segredo_grafana}" \
+  --query SecretString --output text >"$DIR/segredos/grafana_admin"
+chown 472:472 "$DIR/segredos/grafana_admin"
+chmod 400 "$DIR/segredos/grafana_admin"
+
+# --- Serviço systemd: sobe a pilha no boot (também depois de ambiente.sh retomar) --------------
+cat >/etc/systemd/system/observabilidade.service <<EOF
+[Unit]
+Description=Pilha de observabilidade (Collector, Tempo, Loki, Prometheus, Grafana)
+Requires=docker.service
+After=docker.service network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=$DIR
+ExecStart=/usr/bin/docker compose up -d --quiet-pull --remove-orphans
+ExecStop=/usr/bin/docker compose down
+TimeoutStartSec=600
+
+[Install]
+WantedBy=multi-user.target
+EOF
+systemctl daemon-reload
+systemctl enable --now observabilidade.service

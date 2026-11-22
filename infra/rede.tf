@@ -27,7 +27,7 @@ resource "aws_subnet" "publica" {
   vpc_id            = aws_vpc.principal.id
   availability_zone = local.azs[count.index]
   cidr_block        = local.cidrs.publica[count.index]
-  # IP público só quando pedido explicitamente (NAT tem EIP; EC2 do Grafana na T14).
+  # IP público só quando pedido explicitamente (NAT tem EIP; EC2 do Grafana, observabilidade.tf).
   map_public_ip_on_launch = false
   tags                    = { Name = "${local.nome}-publica-${local.azs[count.index]}", Camada = "publica" }
 }

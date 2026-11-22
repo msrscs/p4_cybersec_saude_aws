@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Pausa e retoma o ambiente da AWS para economizar fora do horário de uso (ADR-0036): para os
-# serviços do ECS (frontend e backend), as rotinas agendadas e o RDS. Não apaga nada.
+# serviços do ECS (frontend e backend), as rotinas agendadas, o RDS e a EC2 do Grafana (T14).
+# Não apaga nada; a telemetria guardada na EC2 sobrevive à pausa.
 #
 # Uso (na raiz do repositório, com credenciais da AWS):
 #   infra/scripts/ambiente.sh status
@@ -25,6 +26,9 @@ ROTINAS=(cybersec-limpeza cybersec-verificacao-log)
 # Os mesmos valores de tasks_minimas e tasks_maximas em infra/variables.tf.
 TASKS_MIN="${TASKS_MIN:-2}"
 TASKS_MAX="${TASKS_MAX:-4}"
+# EC2 do Grafana (vazio se observabilidade = false ou antes do primeiro apply da T14).
+GRAFANA="$(terraform -chdir="$RAIZ/infra" output -json grafana_instancia 2>/dev/null \
+  | python3 -c 'import json,sys; v=json.load(sys.stdin); print(v or "")' 2>/dev/null || true)"
 
 aws_() { aws --region "$REGIAO" "$@"; }
 
@@ -67,8 +71,26 @@ escala() {
   aws_ ecs wait services-stable --cluster "$CLUSTER" --services "${SERVICOS[@]}"
 }
 
+estado_grafana() {
+  aws_ ec2 describe-instances --instance-ids "$GRAFANA" \
+    --query 'Reservations[0].Instances[0].State.Name' --output text
+}
+
+grafana() {
+  [[ -n "$GRAFANA" ]] || return 0
+  if [[ $1 == parar ]]; then
+    aws_ ec2 stop-instances --instance-ids "$GRAFANA" >/dev/null
+    echo "  EC2 do Grafana: parando"
+  else
+    aws_ ec2 start-instances --instance-ids "$GRAFANA" >/dev/null
+    aws_ ec2 wait instance-running --instance-ids "$GRAFANA"
+    echo "  EC2 do Grafana: ligada (a pilha sobe pelo systemd em 1-2 min)"
+  fi
+}
+
 status() {
   echo "Banco $BANCO: $(estado_banco)"
+  [[ -z "$GRAFANA" ]] || echo "EC2 do Grafana $GRAFANA: $(estado_grafana)"
   aws_ ecs describe-services --cluster "$CLUSTER" --services "${SERVICOS[@]}" \
     --query 'services[].[serviceName,runningCount,desiredCount]' --output text \
     | while read -r nome rodando desejado; do
@@ -81,9 +103,10 @@ status() {
 }
 
 pausar() {
-  echo "Pausando (rotinas -> serviços -> banco):"
+  echo "Pausando (rotinas -> serviços -> Grafana -> banco):"
   rotinas DISABLED
   escala 0 0 0
+  grafana parar
   case "$(estado_banco)" in
     available)
       aws_ rds stop-db-instance --db-instance-identifier "$BANCO" >/dev/null
@@ -95,7 +118,8 @@ pausar() {
 }
 
 retomar() {
-  echo "Retomando (banco -> serviços -> rotinas):"
+  echo "Retomando (banco e Grafana -> serviços -> rotinas):"
+  grafana ligar
   case "$(estado_banco)" in
     stopped)
       aws_ rds start-db-instance --db-instance-identifier "$BANCO" >/dev/null

@@ -1,0 +1,161 @@
+{
+ "resourceSpans": [
+  {
+   "resource": {
+    "attributes": [
+     {
+      "key": "service.name",
+      "value": {
+       "stringValue": "cybersec-teste"
+      }
+     },
+     {
+      "key": "deployment.environment.name",
+      "value": {
+       "stringValue": "teste"
+      }
+     },
+     {
+      "key": "host.name",
+      "value": {
+       "stringValue": "maquina-secreta"
+      }
+     },
+     {
+      "key": "process.command_line",
+      "value": {
+       "stringValue": "python -m app --cpf 12345678909"
+      }
+     }
+    ]
+   },
+   "scopeSpans": [
+    {
+     "scope": {
+      "name": "teste"
+     },
+     "spans": [
+      {
+       "traceId": "5b8efff798038103d269b633813fc60c",
+       "spanId": "eee19b7ec3c1b174",
+       "name": "GET /pacientes/12345678909",
+       "kind": 2,
+       "startTimeUnixNano": "1795400000000000000",
+       "endTimeUnixNano": "1795400000050000000",
+       "attributes": [
+        {
+         "key": "http.route",
+         "value": {
+          "stringValue": "/pacientes/{id_paciente}"
+         }
+        },
+        {
+         "key": "http.response.status_code",
+         "value": {
+          "intValue": "200"
+         }
+        },
+        {
+         "key": "http.request.method",
+         "value": {
+          "stringValue": "GET"
+         }
+        },
+        {
+         "key": "url.full",
+         "value": {
+          "stringValue": "https://x/pacientes/1?cpf=123.456.789-09"
+         }
+        },
+        {
+         "key": "client.address",
+         "value": {
+          "stringValue": "200.150.10.20"
+         }
+        },
+        {
+         "key": "http.request.header.cookie",
+         "value": {
+          "stringValue": "sessao=sessao-secreta"
+         }
+        },
+        {
+         "key": "enduser.id",
+         "value": {
+          "stringValue": "fulana@exemplo.com"
+         }
+        },
+        {
+         "key": "http.request.header.x-csrf-token",
+         "value": {
+          "stringValue": "csrf-secreto"
+         }
+        },
+        {
+         "key": "paciente.nome",
+         "value": {
+          "stringValue": "Maria da Silva"
+         }
+        },
+        {
+         "key": "db.name",
+         "value": {
+          "stringValue": "12345678909"
+         }
+        },
+        {
+         "key": "error.type",
+         "value": {
+          "stringValue": "Bearer abc.def.ghi"
+         }
+        },
+        {
+         "key": "db.operation.name",
+         "value": {
+          "stringValue": "482913"
+         }
+        },
+        {
+         "key": "url.scheme",
+         "value": {
+          "stringValue": "fulana@exemplo.com"
+         }
+        }
+       ],
+       "events": [
+        {
+         "name": "exception",
+         "timeUnixNano": "1795400000050000000",
+         "attributes": [
+          {
+           "key": "exception.type",
+           "value": {
+            "stringValue": "ValueError"
+           }
+          },
+          {
+           "key": "exception.message",
+           "value": {
+            "stringValue": "CPF 123.456.789-09 de fulana@exemplo.com"
+           }
+          },
+          {
+           "key": "exception.stacktrace",
+           "value": {
+            "stringValue": "senha=hunter2 em python -m app"
+           }
+          }
+         ]
+        }
+       ],
+       "status": {
+        "code": 2,
+        "message": "erro com 123.456.789-09"
+       }
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

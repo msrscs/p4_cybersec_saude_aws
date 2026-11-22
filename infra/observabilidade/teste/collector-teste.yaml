@@ -1,0 +1,15 @@
+# Sobreposição usada só pelo testar_redacao.sh: mesmos receivers OTLP e processadores do
+# collector.yaml, mas tudo sai num arquivo e a leitura do CloudWatch fica desligada.
+exporters:
+  file/saida:
+    path: /saida/telemetria.json
+
+service:
+  pipelines:
+    traces:
+      exporters: [file/saida]
+    metrics:
+      exporters: [file/saida]
+    logs:
+      receivers: [otlp]
+      exporters: [file/saida]

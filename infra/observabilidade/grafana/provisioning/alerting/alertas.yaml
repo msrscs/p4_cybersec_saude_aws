@@ -1,0 +1,206 @@
+# Alertas do APM (T14, ADR-0037), provisionados com o dashboard cybersec-apm.
+# Só na tela do Grafana: sem SMTP nem credencial da AWS, o envio fica silenciado (mute 'sempre').
+{
+  "apiVersion": 1,
+  "groups": [
+    {
+      "orgId": 1,
+      "name": "apm",
+      "folder": "CyberSec Saúde",
+      "interval": "1m",
+      "rules": [
+        {
+          "uid": "cybersec-disponibilidade",
+          "title": "Disponibilidade abaixo de 99%",
+          "condition": "C",
+          "for": "5m",
+          "noDataState": "OK",
+          "execErrState": "Error",
+          "labels": {
+            "sistema": "cybersec",
+            "severidade": "alta"
+          },
+          "annotations": {
+            "summary": "{{ $labels.job }}: disponibilidade de {{ with $values.B }}{{ humanizePercentage .Value }}{{ else }}?{{ end }} nos últimos 5 min",
+            "description": "Fração de respostas sem 5xx abaixo de 99% por 5 min (fórmula 3.1). Veja o dashboard APM e os traces de erro no Tempo.",
+            "__dashboardUid__": "cybersec-apm",
+            "__panelId__": "2"
+          },
+          "data": [
+            {
+              "refId": "A",
+              "datasourceUid": "prometheus",
+              "relativeTimeRange": {
+                "from": 600,
+                "to": 0
+              },
+              "model": {
+                "refId": "A",
+                "expr": "(sum by (job) (rate(http_server_duration_milliseconds_count{http_status_code!~\"5..\"}[5m])) or sum by (job) (rate(http_server_request_duration_seconds_count{http_response_status_code!~\"5..\"}[5m]))) / (sum by (job) (rate(http_server_duration_milliseconds_count[5m])) or sum by (job) (rate(http_server_request_duration_seconds_count[5m])))",
+                "instant": true,
+                "intervalMs": 60000,
+                "maxDataPoints": 43200
+              }
+            },
+            {
+              "refId": "B",
+              "datasourceUid": "__expr__",
+              "model": {
+                "refId": "B",
+                "type": "reduce",
+                "expression": "A",
+                "reducer": "last",
+                "settings": {
+                  "mode": "dropNN"
+                }
+              }
+            },
+            {
+              "refId": "C",
+              "datasourceUid": "__expr__",
+              "model": {
+                "refId": "C",
+                "type": "threshold",
+                "expression": "B",
+                "conditions": [
+                  {
+                    "evaluator": {
+                      "type": "lt",
+                      "params": [
+                        0.99
+                      ]
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "uid": "cybersec-latencia-p95",
+          "title": "Latência p95 acima de 1 s",
+          "condition": "C",
+          "for": "5m",
+          "noDataState": "OK",
+          "execErrState": "Error",
+          "labels": {
+            "sistema": "cybersec",
+            "severidade": "alta"
+          },
+          "annotations": {
+            "summary": "{{ $labels.job }}: p95 de {{ with $values.B }}{{ printf \"%.0f\" .Value }}{{ else }}?{{ end }} ms nos últimos 5 min",
+            "description": "Percentil 95 acima de 1000 ms por 5 min (fórmula 3.2). Veja o dashboard APM e os traces lentos no Tempo.",
+            "__dashboardUid__": "cybersec-apm",
+            "__panelId__": "3"
+          },
+          "data": [
+            {
+              "refId": "A",
+              "datasourceUid": "prometheus",
+              "relativeTimeRange": {
+                "from": 600,
+                "to": 0
+              },
+              "model": {
+                "refId": "A",
+                "expr": "histogram_quantile(0.95, sum by (le, job) (rate(http_server_duration_milliseconds_bucket[5m]))) or 1000 * histogram_quantile(0.95, sum by (le, job) (rate(http_server_request_duration_seconds_bucket[5m])))",
+                "instant": true,
+                "intervalMs": 60000,
+                "maxDataPoints": 43200
+              }
+            },
+            {
+              "refId": "B",
+              "datasourceUid": "__expr__",
+              "model": {
+                "refId": "B",
+                "type": "reduce",
+                "expression": "A",
+                "reducer": "last",
+                "settings": {
+                  "mode": "dropNN"
+                }
+              }
+            },
+            {
+              "refId": "C",
+              "datasourceUid": "__expr__",
+              "model": {
+                "refId": "C",
+                "type": "threshold",
+                "expression": "B",
+                "conditions": [
+                  {
+                    "evaluator": {
+                      "type": "gt",
+                      "params": [
+                        1000
+                      ]
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "contactPoints": [
+    {
+      "orgId": 1,
+      "name": "sem-aviso",
+      "receivers": [
+        {
+          "uid": "sem-aviso",
+          "type": "email",
+          "settings": {
+            "addresses": "sem-aviso@localhost"
+          },
+          "disableResolveMessage": true
+        }
+      ]
+    }
+  ],
+  "muteTimes": [
+    {
+      "orgId": 1,
+      "name": "sempre",
+      "time_intervals": [
+        {
+          "times": [
+            {
+              "start_time": "00:00",
+              "end_time": "24:00"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "policies": [
+    {
+      "orgId": 1,
+      "receiver": "sem-aviso",
+      "group_by": [
+        "alertname",
+        "job"
+      ],
+      "routes": [
+        {
+          "receiver": "sem-aviso",
+          "object_matchers": [
+            [
+              "sistema",
+              "=",
+              "cybersec"
+            ]
+          ],
+          "mute_time_intervals": [
+            "sempre"
+          ]
+        }
+      ]
+    }
+  ]
+}

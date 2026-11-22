@@ -88,6 +88,30 @@ docker run --rm -v "$DIR/loki.yaml:/l.yaml:ro" "$(imagem loki)" \
   -config.file=/l.yaml -verify-config >/dev/null 2>&1 || falha "loki.yaml"
 echo "OK: prometheus.yml e loki.yaml válidos"
 
+# Expressões PromQL do dashboard e dos alertas: sintaxe pelo promtool, com as variáveis do Grafana
+# trocadas por valores concretos.
+python3 - "$DIR" >"$TMP/expressoes.yml" <<'PY'
+import json, sys
+from pathlib import Path
+d = Path(sys.argv[1]) / "grafana"
+exprs = []
+for painel in json.loads((d / "dashboards/apm.json").read_text())["panels"]:
+    exprs += [t["expr"] for t in painel.get("targets", [])]
+texto = (d / "provisioning/alerting/alertas.yaml").read_text()
+alertas = json.loads(texto[texto.index("{"):])
+exprs += [q["model"]["expr"] for g in alertas["groups"] for r in g["rules"] for q in r["data"] if "expr" in q["model"]]
+troca = {"$servico": ".+", "$__rate_interval": "5m", "$__range": "1h"}
+regras = []
+for i, e in enumerate(exprs):
+    for k, v in troca.items():
+        e = e.replace(k, v)
+    regras.append({"record": f"teste:expr_{i}", "expr": e})
+print(json.dumps({"groups": [{"name": "painel", "rules": regras}]}))
+PY
+docker run --rm --entrypoint promtool -v "$TMP/expressoes.yml:/r.yml:ro" \
+  "$(imagem prometheus)" check rules /r.yml >/dev/null || falha "PromQL do dashboard ou dos alertas"
+echo "OK: $(grep -o '"record"' "$TMP/expressoes.yml" | wc -l) expressões PromQL do dashboard e dos alertas válidas"
+
 # --- 3. Pilha sem o Collector (ele usa a rede do host, que só existe na EC2) ------------------
 mkdir -p "$TMP/pilha/segredos"
 cp -r "$DIR"/{compose.yml,tempo.yaml,loki.yaml,prometheus.yml,collector.yaml,grafana} "$TMP/pilha/"
@@ -110,3 +134,16 @@ for alvo in http://localhost:3000/api/health http://prometheus:9090/-/ready \
   falha "serviço não ficou pronto: $alvo"
 done
 echo "OK: Grafana, Prometheus, Loki e Tempo iniciam com as configs e o endurecimento do compose"
+
+# Provisionamento do Grafana (dashboard, alertas, contato e silêncio) sem erro.
+sleep 5
+LOGS_GRAFANA="$(docker compose -p "$PROJETO" -f "$TMP/pilha/compose.yml" --project-directory "$TMP/pilha" \
+  logs grafana 2>&1)"
+# (provisioning/plugins não existe de propósito: sem plugins; o Grafana só registra a ausência.)
+if grep -iE 'level=error' <<<"$LOGS_GRAFANA" | grep -v 'provisioning/plugins' \
+  | grep -iE 'provision|dashboard|alert|rule' >&2; then
+  falha "erro no provisionamento do Grafana (acima)"
+fi
+grep -q 'finished to provision alerting' <<<"$LOGS_GRAFANA" || falha "alertas não provisionados"
+grep -q 'finished to provision dashboards' <<<"$LOGS_GRAFANA" || falha "dashboards não provisionados"
+echo "OK: Grafana provisionou o dashboard APM e os alertas"

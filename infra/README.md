@@ -71,6 +71,11 @@ checkov -d . --framework terraform --skip-path .terraform   # 0 falhas; exceçõ
      --overrides '{"containerOverrides":[{"name":"administracao","command":["python","-m","scripts.importar_cid"]}]}')
    aws ecs wait tasks-stopped --cluster "$C" --tasks "$T"
    aws ecs describe-tasks --cluster "$C" --tasks "$T" --query 'tasks[0].containers[0].exitCode'   # 0
+   # Cadastros de catálogo (db/seeds/cadastros.json, ADR-0035), depois do CID:
+   T=$(rodar --task-definition cybersec-administracao \
+     --overrides '{"containerOverrides":[{"name":"administracao","command":["python","-m","scripts.importar_cadastros"]}]}')
+   aws ecs wait tasks-stopped --cluster "$C" --tasks "$T"
+   aws ecs describe-tasks --cluster "$C" --tasks "$T" --query 'tasks[0].containers[0].exitCode'   # 0
    for s in backend frontend; do aws ecs update-service --cluster "$C" --service $s --force-new-deployment >/dev/null; done
    ```
    Uma task de banco ou de rotina que termina com erro gera alerta no SNS. Os logs ficam em `/ecs/cybersec/<família>`.

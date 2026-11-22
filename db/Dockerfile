@@ -8,6 +8,7 @@
 #   alembic upgrade head                 (padrão; MIGRATOR_DB_PASSWORD)
 #   python -m scripts.bootstrap_db       (1x; usuário mestre do RDS: POSTGRES_USER/PASSWORD)
 #   python -m scripts.importar_cid       (catálogo CID; usa as chaves da aplicação)
+#   python -m scripts.importar_cadastros (tipos, unidades, serviços, OCI e agendas; depois do CID)
 #   python -m scripts.criar_usuario|atribuir_grupo|resetar_acesso  (interativos, ECS Exec)
 
 FROM ghcr.io/astral-sh/uv:0.13.6 AS uv
@@ -22,6 +23,7 @@ COPY backend/app ./app
 # Scripts administrativos interativos (getpass/input): rodam na task `administracao` do ECS, aberta
 # só sob demanda por ECS Exec (ADR-0032). Não entram na imagem do backend, que atende a internet.
 COPY backend/scripts/__init__.py backend/scripts/bootstrap_db.py backend/scripts/importar_cid.py \
+     backend/scripts/importar_cadastros.py \
      backend/scripts/criar_usuario.py backend/scripts/atribuir_grupo.py \
      backend/scripts/resetar_acesso.py ./scripts/
 

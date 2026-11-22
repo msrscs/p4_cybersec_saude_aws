@@ -18,7 +18,7 @@ receivers:
       http:
         endpoint: ${env:OTLP_ESCUTA}
         # Sem CORS: só as tasks falam com o Collector, nunca um navegador.
-  awscloudwatch:
+  aws_cloudwatch:
     region: ${env:AWS_REGION}
     logs:
       poll_interval: 1m
@@ -117,9 +117,9 @@ exporters:
     endpoint: ${env:DESTINO_TEMPO}
     tls:
       insecure: true # só no host (127.0.0.1)
-  otlphttp/loki:
+  otlp_http/loki:
     endpoint: ${env:DESTINO_LOKI}
-  otlphttp/prometheus:
+  otlp_http/prometheus:
     endpoint: ${env:DESTINO_PROMETHEUS}
     # O Prometheus aceita métricas OTLP; logs e traces não vão para ele.
     traces_endpoint: ""
@@ -140,8 +140,8 @@ service:
     metrics:
       receivers: [otlp]
       processors: [memory_limiter, redaction, batch]
-      exporters: [otlphttp/prometheus]
+      exporters: [otlp_http/prometheus]
     logs:
-      receivers: [otlp, awscloudwatch]
+      receivers: [otlp, aws_cloudwatch]
       processors: [memory_limiter, transform/origem, transform/corpo, redaction, batch]
-      exporters: [otlphttp/loki]
+      exporters: [otlp_http/loki]

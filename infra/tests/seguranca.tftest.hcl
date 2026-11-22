@@ -80,6 +80,9 @@ mock_provider "aws" {
   mock_data "aws_elb_service_account" {
     defaults = { arn = "arn:aws:iam::507241528517:root" }
   }
+  mock_data "aws_ssm_parameter" {
+    defaults = { insecure_value = "ami-0123456789abcdef0" }
+  }
 }
 
 mock_provider "aws" {
@@ -310,4 +313,76 @@ run "backup_nunca_desligado" {
     rds_retencao_backup_dias = 0
   }
   expect_failures = [var.rds_retencao_backup_dias]
+}
+
+# --- Observabilidade (T14, ADR-0037) ------------------------------------------------------------
+
+run "grafana_isolado" {
+  command = apply
+
+  assert {
+    condition = (
+      aws_instance.grafana[0].metadata_options[0].http_tokens == "required"
+      && aws_instance.grafana[0].metadata_options[0].http_put_response_hop_limit == 1
+    )
+    error_message = "IMDSv2 obrigatório, com hop limit 1 (containers fora da rede do host sem credenciais)."
+  }
+  assert {
+    condition     = aws_instance.grafana[0].root_block_device[0].encrypted
+    error_message = "Disco da EC2 do Grafana cifrado."
+  }
+  assert {
+    condition     = aws_instance.grafana[0].private_ip == "10.20.0.10" && aws_instance.grafana[0].subnet_id == aws_subnet.publica[0].id
+    error_message = "IP privado fixo na subnet pública: é o endpoint OTLP das tasks."
+  }
+  assert {
+    condition = alltrue([
+      for r in aws_vpc_security_group_ingress_rule.grafana_otlp :
+      r.from_port == 4318 && r.to_port == 4318 && r.cidr_ipv4 == null && r.referenced_security_group_id != null
+    ]) && length(aws_vpc_security_group_ingress_rule.grafana_otlp) == 2
+    error_message = "Na EC2 do Grafana só entra OTLP 4318, e só dos SGs do frontend e do backend."
+  }
+  assert {
+    condition     = aws_vpc_security_group_egress_rule.grafana_https[0].from_port == 443 && aws_vpc_security_group_egress_rule.grafana_https[0].to_port == 443
+    error_message = "A EC2 do Grafana só sai por HTTPS."
+  }
+  assert {
+    condition = alltrue([
+      for f in ["frontend", "backend"] : contains(
+        [for e in jsondecode(aws_ecs_task_definition.familia[f].container_definitions)[0].environment : "${e.name}=${e.value}"],
+        "OTEL_EXPORTER_OTLP_ENDPOINT=http://10.20.0.10:4318"
+      )
+    ])
+    error_message = "Frontend e backend exportam para o Collector da EC2."
+  }
+  assert {
+    condition     = length(aws_instance.grafana[0].user_data_base64) < 21800
+    error_message = "user_data acima de 16 KB (limite da EC2)."
+  }
+}
+
+run "sem_observabilidade" {
+  command = plan
+  variables {
+    observabilidade = false
+  }
+  assert {
+    condition     = length(aws_instance.grafana) == 0 && length(aws_vpc_security_group_egress_rule.otlp) == 0
+    error_message = "observabilidade = false remove a EC2 e a saída OTLP."
+  }
+  assert {
+    condition = !contains(
+      [for e in jsondecode(aws_ecs_task_definition.familia["backend"].container_definitions)[0].environment : e.name],
+      "OTEL_EXPORTER_OTLP_ENDPOINT"
+    )
+    error_message = "Sem a EC2, as tasks não exportam telemetria."
+  }
+}
+
+run "grafana_so_em_arm" {
+  command = plan
+  variables {
+    grafana_tipo_instancia = "t3.small"
+  }
+  expect_failures = [var.grafana_tipo_instancia]
 }

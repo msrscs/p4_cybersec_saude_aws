@@ -19,6 +19,7 @@ Tasks avulsas: migracao, bootstrap, administracao (ECS Exec)
 | `ecr.tf`, `ecs.tf` | Repositórios, cluster, task definitions, serviços, auto scaling |
 | `alb.tf`, `cloudfront.tf` | ALB interno, CloudFront, VPC Origin, WAF |
 | `rotinas.tf` | Scheduler e alertas (SNS) |
+| `observabilidade.tf`, `observabilidade/` | EC2 do Grafana: Collector com redação, Tempo, Loki, Prometheus (T14) |
 | `tests/` | `terraform test` com provider simulado (sem credenciais) |
 
 ## Validação local (sem conta AWS)
@@ -93,6 +94,39 @@ checkov -d . --framework terraform --skip-path .terraform   # 0 falhas; exceçõ
    Use `/bin/sh` e digite o comando dentro da sessão. Passado por `--command`, o CPF ficaria registrado no CloudTrail. O conteúdo da sessão não é gravado (ADR-0032). A criação do usuário e a mudança de grupo ficam no log WORM da aplicação, e a abertura da sessão fica no CloudTrail. A task se encerra sozinha em 1 h.
 7. **Conferir:** abra `terraform -chdir=infra output -raw url`, faça o login com MFA e veja na consulta do log se o `ip_origem` é o seu IP real, e não um IP 10.20.x.x. Isso confirma a cadeia CloudFront → ALB → frontend → Service Connect → backend (ADR-0029, ADR-0032).
 
+## Observabilidade (T14, ADR-0037)
+
+A EC2 `cybersec-grafana` (t4g.small, subnet pública, IP privado `10.20.0.10`) roda em Docker Compose:
+- o **OTel Collector**, com redação;
+- o **Tempo** (traces), o **Loki** (logs) e o **Prometheus** (métricas);
+- o **Grafana**.
+
+A telemetria chega por dois caminhos:
+- o frontend e o backend exportam OTLP para `10.20.0.10:4318`;
+- o Collector lê os logs `/ecs/cybersec/*` do CloudWatch.
+
+Tudo passa pela redação antes de ser guardado, por 7 dias.
+
+```bash
+infra/scripts/grafana.sh senha   # senha do admin (usuário admin)
+infra/scripts/grafana.sh         # túnel SSM: abra http://localhost:3000; Ctrl+C fecha
+```
+
+- **Acesso:**
+  - só pelo SSM: sem SSH e sem nenhuma porta aberta para a internet;
+  - entra só OTLP 4318, e só dos security groups do frontend e do backend;
+  - cada sessão fica no CloudTrail.
+- **Depois do primeiro `apply` da T14,** as task definitions ganham `OTEL_EXPORTER_OTLP_ENDPOINT`. Faça o deploy para os serviços passarem a exportar:
+  ```bash
+  for s in backend frontend; do aws ecs update-service --cluster cybersec --service $s --task-definition cybersec-$s >/dev/null; done
+  ```
+- **Mudou algo em `infra/observabilidade/`?** O `apply` recria a VM, e a telemetria guardada se perde. Antes, teste localmente:
+  ```bash
+  infra/observabilidade/testar_redacao.sh   # só Docker; falha se qualquer dado sensível passar
+  ```
+- **Imagens:** são fixadas por digest no `compose.yml`. Para atualizar, troque a tag e o digest, rode o teste e aplique.
+- **Desligar a pilha:** `observabilidade = false` no `terraform.tfvars` remove a EC2 e desliga o OTLP das tasks.
+
 ## Operação
 
 - **Deploy de uma nova versão:** feito pelo pipeline (T15). Os serviços ignoram mudanças de `task_definition` no Terraform para não desfazer o deploy do pipeline. Depois de mudar variáveis de ambiente pelo Terraform, rode `aws ecs update-service --cluster cybersec --service <s> --task-definition cybersec-<s>` (última revisão).
@@ -108,4 +142,5 @@ checkov -d . --framework terraform --skip-path .terraform   # 0 falhas; exceçõ
   - **Retomar** leva de 5 a 10 minutos, quase tudo esperando o RDS.
   - **O RDS religa sozinho em 7 dias.** Se precisar, rode `pausar` de novo.
   - **Com o ambiente pausado, não rode `terraform apply`**, porque ele religaria o auto scaling e as rotinas com o banco parado. Rode `retomar` antes. Enquanto estiver pausado, o `plan` mostra essa diferença.
+  - A EC2 do Grafana também é parada e religada. O disco dela (30 GB) continua cobrando.
   - **Continuam cobrando:** NAT Gateway, ALB, WAF, KMS, Secrets Manager, logs e o armazenamento do RDS.

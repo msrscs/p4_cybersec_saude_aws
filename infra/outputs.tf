@@ -36,3 +36,13 @@ output "sns_alertas" {
 output "rede_tasks_banco" {
   value = "awsvpcConfiguration={subnets=[${join(",", aws_subnet.app[*].id)}],securityGroups=[${aws_security_group.db_admin.id}],assignPublicIp=DISABLED}"
 }
+
+output "grafana_instancia" {
+  description = "EC2 do Grafana (T14). Acesso: infra/scripts/grafana.sh."
+  value       = var.observabilidade ? aws_instance.grafana[0].id : null
+}
+
+output "otlp_endpoint" {
+  description = "Endpoint OTLP/HTTP que as tasks recebem (null: telemetria desligada)."
+  value       = local.otlp_endpoint
+}

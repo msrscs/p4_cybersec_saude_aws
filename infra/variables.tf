@@ -122,9 +122,39 @@ variable "backend_memoria" {
 }
 
 variable "otlp_endpoint" {
-  description = "Endpoint OTLP/HTTP do Collector (T14), ex.: http://10.20.0.10:4318. null desliga."
+  description = "Endpoint OTLP/HTTP fora da VPC. null usa a EC2 do Grafana (observabilidade) ou desliga."
   type        = string
   default     = null
+}
+
+# --- Observabilidade (T14, ADR-0037) -----------------------------------------------------------
+
+variable "observabilidade" {
+  description = "EC2 do Grafana com Collector, Tempo, Loki e Prometheus; liga o OTLP das tasks."
+  type        = bool
+  default     = true
+}
+
+variable "grafana_tipo_instancia" {
+  description = "Tipo da EC2 do Grafana (ARM: as imagens da pilha são multi-arquitetura)."
+  type        = string
+  default     = "t4g.small"
+  validation {
+    condition     = can(regex("^[a-z][0-9]+g[a-z]*\\.", var.grafana_tipo_instancia))
+    error_message = "Use um tipo ARM (Graviton), ex.: t4g.small: a AMI e o Compose são arm64."
+  }
+}
+
+variable "compose_versao" {
+  description = "Versão do plugin Docker Compose instalado na EC2 do Grafana."
+  type        = string
+  default     = "v5.8.0"
+}
+
+variable "compose_sha256" {
+  description = "SHA-256 de docker-compose-linux-aarch64 dessa versão (conferido no boot)."
+  type        = string
+  default     = "1a9c918b2fb49b9c87f0018c64b5abd0d30715155e98dc939779fbaee6c414d3"
 }
 
 # --- Borda -------------------------------------------------------------------------------

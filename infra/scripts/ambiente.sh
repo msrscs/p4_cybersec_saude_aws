@@ -62,7 +62,7 @@ escala() {
   for servico in "${SERVICOS[@]}"; do
     aws_ application-autoscaling register-scalable-target --service-namespace ecs \
       --scalable-dimension ecs:service:DesiredCount \
-      --resource-id "service/$CLUSTER/$servico" --min-capacity "$minimo" --max-capacity "$maximo"
+      --resource-id "service/$CLUSTER/$servico" --min-capacity "$minimo" --max-capacity "$maximo" >/dev/null
     aws_ ecs update-service --cluster "$CLUSTER" --service "$servico" \
       --desired-count "$desejado" >/dev/null
     echo "  serviço $servico: $desejado tasks (auto scaling $minimo-$maximo)"

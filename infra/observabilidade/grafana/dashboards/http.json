@@ -22,7 +22,7 @@
           "type": "prometheus",
           "uid": "prometheus"
         },
-        "query": "label_values(service_name)",
+        "query": "label_values(job)",
         "refresh": 2,
         "current": {
           "text": "All",
@@ -61,8 +61,8 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum by (service_name, http_route) (rate({__name__=~\"http_server_(request_)?duration.*_count\", service_name=~\"$servico\"}[5m]))",
-          "legendFormat": "{{service_name}} {{http_route}}"
+          "expr": "sum by (job, http_route) (rate({__name__=~\"http_server_(request_)?duration.*_count\", job=~\"$servico\"}[5m]))",
+          "legendFormat": "{{job}} {{http_route}}"
         }
       ]
     },
@@ -95,8 +95,8 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "histogram_quantile(0.95, sum by (le, service_name, http_route) (rate({__name__=~\"http_server_(request_)?duration.*_bucket\", service_name=~\"$servico\"}[5m])))",
-          "legendFormat": "{{service_name}} {{http_route}}"
+          "expr": "histogram_quantile(0.95, sum by (le, job, http_route) (rate({__name__=~\"http_server_(request_)?duration.*_bucket\", job=~\"$servico\"}[5m])))",
+          "legendFormat": "{{job}} {{http_route}}"
         }
       ]
     },
@@ -129,8 +129,8 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum by (service_name, http_route) (rate({__name__=~\"http_server_(request_)?duration.*_count\", service_name=~\"$servico\", http_response_status_code=~\"5..\"}[5m]))",
-          "legendFormat": "{{service_name}} {{http_route}}"
+          "expr": "sum by (job, http_route) (rate({__name__=~\"http_server_(request_)?duration.*_count\", job=~\"$servico\", http_response_status_code=~\"5..\"}[5m]))",
+          "legendFormat": "{{job}} {{http_route}}"
         }
       ]
     }

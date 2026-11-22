@@ -47,6 +47,14 @@ processors:
           - replace_pattern(body, "\\b\\d{6}\\b", "***")
           - replace_pattern(body, "\\b\\d{1,3}(\\.\\d{1,3}){3}\\b", "***IP***")
 
+  # Logs do CloudWatch chegam sem service.name: usa o grupo (/ecs/cybersec/backend etc.).
+  transform/origem:
+    error_mode: ignore
+    log_statements:
+      - context: resource
+        statements:
+          - set(attributes["service.name"], attributes["cloudwatch.log.group.name"]) where attributes["service.name"] == nil and attributes["cloudwatch.log.group.name"] != nil
+
   # Spans: o redaction não olha o nome nem o status. O SDK já troca o nome de span sem rota pelo
   # método e não manda descrição de status (ADR-0031); aqui é a segunda barreira.
   transform/spans:
@@ -105,7 +113,7 @@ processors:
     send_batch_size: 512
 
 exporters:
-  otlp/tempo:
+  otlp_grpc/tempo:
     endpoint: ${env:DESTINO_TEMPO}
     tls:
       insecure: true # só no host (127.0.0.1)
@@ -128,12 +136,12 @@ service:
     traces:
       receivers: [otlp]
       processors: [memory_limiter, transform/spans, redaction, batch]
-      exporters: [otlp/tempo]
+      exporters: [otlp_grpc/tempo]
     metrics:
       receivers: [otlp]
       processors: [memory_limiter, redaction, batch]
       exporters: [otlphttp/prometheus]
     logs:
       receivers: [otlp, awscloudwatch]
-      processors: [memory_limiter, transform/corpo, redaction, batch]
+      processors: [memory_limiter, transform/origem, transform/corpo, redaction, batch]
       exporters: [otlphttp/loki]

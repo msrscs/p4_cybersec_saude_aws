@@ -5,6 +5,9 @@ set -euo pipefail
 umask 027
 DIR=/opt/observabilidade
 
+# --- Sem SSH: o acesso é só pelo SSM (o SG também não abre a 22) -----------------------------
+systemctl disable --now sshd.service sshd.socket 2>/dev/null || true
+
 # --- Docker e plugin Compose (versão fixa, hash conferido) -----------------------------------
 dnf install -y docker
 systemctl enable --now docker

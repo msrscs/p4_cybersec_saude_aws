@@ -1,0 +1,121 @@
+# Pilha de observabilidade da EC2 do Grafana (T14, ADR-0037). A mesma definição roda localmente
+# para testes (testar_redacao.sh).
+#
+# - O Collector usa a rede do host: é o único container que alcança o IMDS (hop limit 1 na EC2)
+#   para ler os logs do CloudWatch. Ele recebe OTLP só no IP privado (OTLP_ESCUTA).
+# - Tempo, Loki e Prometheus publicam portas só em 127.0.0.1, para o Collector; o Grafana as alcança
+#   pela rede interna. O Grafana publica só em 127.0.0.1:3000, aberto pelo port forwarding do SSM.
+# - Imagens fixas por digest; containers com raiz somente leitura, sem capabilities.
+#
+# Arquivos fora do git, criados na EC2 pelo user_data (ou à mão, no teste local):
+#   .env                       OTLP_ESCUTA, AWS_REGION, GRUPOS_DE_LOG
+#   segredos/grafana_admin     senha do admin do Grafana (permissão 600)
+
+name: observabilidade
+
+x-endurecido: &endurecido
+  restart: unless-stopped
+  read_only: true
+  cap_drop: [ALL]
+  security_opt: ["no-new-privileges:true"]
+  logging:
+    driver: json-file
+    options: { max-size: "10m", max-file: "3" }
+
+services:
+  collector:
+    <<: *endurecido
+    image: otel/opentelemetry-collector-contrib:0.165.0@sha256:e40d61f10c9a617cca1ffd1be4d7e2b3a4b0f0001798ff07e58cabe82e618cea
+    command: ["--config=/etc/otelcol/collector.yaml"]
+    network_mode: host
+    env_file: .env
+    environment:
+      DESTINO_TEMPO: 127.0.0.1:4317
+      DESTINO_LOKI: http://127.0.0.1:3100/otlp
+      DESTINO_PROMETHEUS: http://127.0.0.1:9090/api/v1/otlp
+    volumes:
+      - ./collector.yaml:/etc/otelcol/collector.yaml:ro
+    mem_limit: 200m
+    depends_on: [tempo, loki, prometheus]
+
+  tempo:
+    <<: *endurecido
+    image: grafana/tempo:3.1.1@sha256:64e2fbd56d9c2b3412a4b430a58ea59e91a670b1e75f920a0c702213ad145044
+    command: ["-config.file=/etc/tempo.yaml"]
+    volumes:
+      - ./tempo.yaml:/etc/tempo.yaml:ro
+      - tempo:/var/tempo
+    tmpfs: [/tmp]
+    ports: ["127.0.0.1:4317:4317"]
+    networks: [obs]
+    mem_limit: 320m
+
+  loki:
+    <<: *endurecido
+    image: grafana/loki:3.7.10@sha256:b43c257ccfc925d4a50b8717cac61a3b51df8c48d01847936057e5c4075a24a7
+    command: ["-config.file=/etc/loki/loki.yaml"]
+    volumes:
+      - ./loki.yaml:/etc/loki/loki.yaml:ro
+      - loki:/loki
+    tmpfs: [/tmp]
+    ports: ["127.0.0.1:3100:3100"]
+    networks: [obs]
+    mem_limit: 320m
+
+  prometheus:
+    <<: *endurecido
+    image: prom/prometheus:v3.16.0@sha256:e04987641b57704f408e31f6373ba4138ecf27cb4a165d24aabb6c38fddd0f06
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=7d
+      - --web.enable-otlp-receiver
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus:/prometheus
+    ports: ["127.0.0.1:9090:9090"]
+    networks: [obs]
+    mem_limit: 320m
+
+  grafana:
+    <<: *endurecido
+    image: grafana/grafana:13.2.6@sha256:b21409d7951ddcfd63a4b49083e4ef2cc35bc1437d071813bf82bfb238b00bca
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD__FILE: /run/secrets/grafana_admin
+      GF_SECURITY_DISABLE_GRAVATAR: "true"
+      GF_SECURITY_COOKIE_SAMESITE: strict
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+      GF_AUTH_BASIC_ENABLED: "false"
+      GF_AUTH_LOGIN_MAXIMUM_INACTIVE_LIFETIME_DURATION: 1h
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_USERS_ALLOW_ORG_CREATE: "false"
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+      GF_ANALYTICS_CHECK_FOR_PLUGIN_UPDATES: "false"
+      GF_PLUGINS_PREINSTALL_DISABLED: "true"
+      GF_NEWS_NEWS_FEED_ENABLED: "false"
+      GF_SNAPSHOTS_EXTERNAL_ENABLED: "false"
+    secrets: [grafana_admin]
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/etc/grafana/dashboards:ro
+      - grafana:/var/lib/grafana
+    tmpfs: [/tmp]
+    ports: ["127.0.0.1:3000:3000"]
+    networks: [obs]
+    mem_limit: 256m
+    depends_on: [tempo, loki, prometheus]
+
+secrets:
+  grafana_admin:
+    file: ./segredos/grafana_admin
+
+networks:
+  obs: {}
+
+volumes:
+  tempo: {}
+  loki: {}
+  prometheus: {}
+  grafana: {}

@@ -1,0 +1,9 @@
+# Prometheus (T14, ADR-0037): só recebe métricas OTLP do Collector (--web.enable-otlp-receiver);
+# não raspa nenhum alvo. Retenção de 7 dias pela linha de comando (compose.yml).
+global:
+  evaluation_interval: 1m
+
+otlp:
+  # O recurso já chega reduzido a service.name e deployment.environment.name (ADR-0031).
+  promote_resource_attributes:
+    - deployment.environment.name

@@ -6,9 +6,6 @@ updates:
   - package-ecosystem: npm
     directory: /frontend
     schedule: { interval: weekly }
-  - package-ecosystem: github-actions
-    directory: /
-    schedule: { interval: weekly }
   - package-ecosystem: docker
     directories: [/backend, /frontend, /db]
     schedule: { interval: weekly }

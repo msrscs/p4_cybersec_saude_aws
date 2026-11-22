@@ -112,6 +112,15 @@ infra/scripts/grafana.sh senha   # senha do admin (usuário admin)
 infra/scripts/grafana.sh         # túnel SSM: abra http://localhost:3000; Ctrl+C fecha
 ```
 
+- **Dashboard "CyberSec Saúde — APM"** (pasta CyberSec Saúde), adaptado do *OpenTelemetry APM rev6* para as métricas do SDK. Mostra:
+  - disponibilidade (respostas sem 5xx);
+  - latência p50, p95 e p99 em ms;
+  - requisições por minuto e por classe de status, latência média e uma tabela por serviço.
+
+  O filtro é por serviço (`job`). Não há quebra por rota, porque as métricas não têm `http_route`.
+- **Alertas** (provisionados): disponibilidade abaixo de 99% e p95 acima de 1 s, ambos sustentados por 5 min.
+  - Aparecem só na tela do Grafana. O envio fica silenciado (mute `sempre`), porque o Grafana não tem SMTP nem credencial da AWS.
+  - Para notificar, troque o contato `sem-aviso` em `grafana/provisioning/alerting/alertas.yaml` e remova o silêncio.
 - **Acesso:**
   - só pelo SSM: sem SSH e sem nenhuma porta aberta para a internet;
   - entra só OTLP 4318, e só dos security groups do frontend e do backend;

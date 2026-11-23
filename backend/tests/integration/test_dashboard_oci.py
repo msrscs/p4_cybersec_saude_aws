@@ -211,6 +211,24 @@ def test_filtrar_outra_unidade_nao_amplia_o_alcance(
     assert sum(p["abertas"] for p in corpo["serie"]) == 0
 
 
+def test_oci_aberta_para_outra_unidade_conta_para_a_origem(
+    logar: Logar,  # noqa: F811
+    cenario: Cenario,  # noqa: F811
+    fabrica_sessao: Fabrica,
+    settings_integracao: Settings,
+) -> None:
+    """ADR-0039: a OCI conta para quem abriu, mas a etapa só para a unidade dela."""
+    tipo = cenario.tipo["id"]
+    local = _na_unidade(
+        logar("Navegador"), cenario.unidade["id"], fabrica_sessao, settings_integracao
+    )
+    _abrir(cenario, local, id_unidade=cenario.outra_unidade["id"])
+    corpo = _dashboard(local, tipo)
+    assert corpo["abertas"]["em_aberto"] == 1
+    assert corpo["etapas"]["agendado"] == 0
+    assert cenario.outra_unidade["nome"] not in str(corpo)
+
+
 def test_filtro_de_unidade_do_gestor(logar: Logar, cenario: Cenario) -> None:  # noqa: F811
     tipo = cenario.tipo["id"]
     _abrir(cenario)

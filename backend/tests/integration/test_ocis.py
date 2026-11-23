@@ -214,22 +214,44 @@ def test_sem_unidade_nao_alcanca_nada(logar: Logar, cenario: Cenario) -> None:  
     assert api.get("/ocis/opcoes").json()["unidades_abertura"] == []
 
 
-def test_so_abre_na_propria_unidade(
+def test_navegador_abre_em_outra_unidade_e_continua_vendo_a_oci(
     logar: Logar,  # noqa: F811
     cenario: Cenario,
     fabrica_sessao: Fabrica,
     settings_integracao: Settings,
 ) -> None:
-    api = _na_unidade(
+    """ADR-0039: a 1ª etapa pode ser em outra unidade; a de quem abriu fica como origem."""
+    daqui = _na_unidade(
         logar("Navegador"), cenario.unidade["id"], fabrica_sessao, settings_integracao
     )
-    resp = api.post("/ocis", json=_corpo(cenario, id_unidade=cenario.outra_unidade["id"]))
-    assert resp.status_code == 403
-    assert resp.json() == {"detail": "Acesso negado."}
-    opcoes = api.get("/ocis/opcoes").json()
-    assert {u["id"] for u in opcoes["unidades_abertura"]} == {cenario.unidade["id"]}
-    assert cenario.outra_unidade["id"] in {u["id"] for u in opcoes["unidades"]}
-    _abrir(cenario, api)
+    de_la = _na_unidade(
+        logar("Navegador"), cenario.outra_unidade["id"], fabrica_sessao, settings_integracao
+    )
+    opcoes = daqui.get("/ocis/opcoes").json()
+    assert {cenario.unidade["id"], cenario.outra_unidade["id"]} <= {
+        u["id"] for u in opcoes["unidades_abertura"]
+    }
+
+    oci = _abrir(cenario, daqui, id_unidade=cenario.outra_unidade["id"])
+    with fabrica_sessao() as db:
+        gravada = db.scalars(select(Oci).where(Oci.id_publico == uuid.UUID(oci["id"]))).one()
+        assert gravada.id_unidade_origem == cenario.unidade["id"]
+
+    # Quem abriu vê, lista e edita a OCI, mas não marca a etapa da outra unidade.
+    detalhe = daqui.get(f"/ocis/{oci['id']}").json()
+    assert [e["pode_marcar"] for e in detalhe["navegacoes"]] == [False]
+    assert oci["id"] in {i["id"] for i in daqui.post("/ocis/lista", json={}).json()["itens"]}
+    filtro = {"id_unidade": cenario.unidade["id"]}
+    assert oci["id"] in {i["id"] for i in daqui.post("/ocis/lista", json=filtro).json()["itens"]}
+    assert daqui.patch(f"/ocis/{oci['id']}", json={"cid": cenario.cid["id"]}).status_code == 200
+    etapa = f"/ocis/{oci['id']}/navegacoes/{detalhe['navegacoes'][0]['id']}"
+    assert daqui.patch(etapa, json={"status": "realizado"}).status_code == 403
+
+    # A unidade da etapa também vê e é quem marca.
+    assert [e["pode_marcar"] for e in de_la.get(f"/ocis/{oci['id']}").json()["navegacoes"]] == [
+        True
+    ]
+    assert de_la.patch(etapa, json={"status": "realizado"}).status_code == 200
 
 
 def test_encaminhar_abre_o_acesso_a_outra_unidade_e_cada_uma_marca_a_sua_etapa(

@@ -22,7 +22,7 @@ x-banco-local: &banco-local
 
 services:
   db:
-    image: postgres:18
+    image: public.ecr.aws/docker/library/postgres:18
     container_name: cybersec_saude-db
     restart: unless-stopped
     env_file: .env

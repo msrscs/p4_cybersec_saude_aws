@@ -1,9 +1,10 @@
 """OCI e navegação (RF-12, ADR-0025): o vínculo entre paciente e CID é dado de saúde.
 
-Alcance por unidade em cada operação: sem oci:todas_unidades, o usuário só alcança OCIs com alguma
-navegação na própria unidade, e só marca a navegação da própria unidade. Fora do alcance, a OCI é
-tratada como inexistente e a tentativa fica no log. O resultado é cifrado (envelope por registro),
-e nenhum dado clínico vai para o log: só quem fez, sobre qual paciente e OCI, e os campos alterados.
+Alcance por unidade em cada operação: sem oci:todas_unidades, o usuário só alcança OCIs abertas pela
+própria unidade ou com alguma navegação nela (ADR-0039), e só marca a navegação da própria unidade.
+Fora do alcance, a OCI é tratada como inexistente e a tentativa fica no log. O resultado é cifrado
+(envelope por registro), e nenhum dado clínico vai para o log: só quem fez, sobre qual paciente e
+OCI, e os campos alterados.
 """
 
 import uuid
@@ -125,14 +126,15 @@ def alcance_de(db: Session, autor: bytes) -> Alcance:
 def opcoes_de_abertura(
     db: Session, autor: bytes
 ) -> tuple[list[TipoOci], list[UnidadeSaude], list[UnidadeSaude]]:
-    """Tipos ativos, unidades ativas e as unidades em que o usuário pode abrir uma OCI."""
+    """Tipos ativos, unidades ativas e as unidades em que o usuário pode abrir uma OCI.
+
+    Quem pode abrir escolhe qualquer unidade para a 1ª etapa (ADR-0039); sem unidade e sem alcance
+    global, nenhuma, porque a OCI ficaria invisível para quem a abriu.
+    """
     alcance = alcance_de(db, autor)
     unidades = cadastro_repo.ativos(db, UnidadeSaude, 1000)
-    return (
-        cadastro_repo.ativos_tipo_oci(db, 1000),
-        unidades,
-        [u for u in unidades if alcance.inclui(u.id_unidade)],
-    )
+    pode_abrir = alcance.todas_as_unidades or alcance.unidade is not None
+    return cadastro_repo.ativos_tipo_oci(db, 1000), unidades, unidades if pode_abrir else []
 
 
 def cids_do_tipo(db: Session, id_tipo_oci: int) -> list[Cid]:
@@ -147,9 +149,14 @@ def abrir(
     ctx: ContextoRequisicao,
     agora: datetime,
 ) -> DetalheOci:
-    """Abre a OCI com a primeira etapa; é essa etapa que define em qual unidade ela é vista."""
+    """Abre a OCI com a primeira etapa, em qualquer unidade que atenda o CID (ADR-0039).
+
+    A unidade de quem abre fica como origem e continua vendo a OCI; a da etapa também passa a ver.
+    """
     alcance = alcance_de(db, autor)
-    if not alcance.inclui(dados.id_unidade):
+    usuario = usuario_repo.buscar(db, autor)
+    origem = usuario.id_unidade if usuario else None
+    if not alcance.todas_as_unidades and origem is None:
         _auditar_fora_do_alcance(db, autor, ctx, resumo={"id_unidade": dados.id_unidade})
         raise ForaDoAlcance
     cpf_hash = hash_busca(settings.chave_hmac, FinalidadeHash.CPF, dados.cpf)
@@ -169,6 +176,7 @@ def abrir(
         cpf_paciente_hash=cpf_hash,
         cid_hash=dados.cid_hash,
         prazo_em=agora + timedelta(days=tipo.prazo_diagnostico),
+        id_unidade_origem=origem,
     )
     try:
         with db.begin_nested():

@@ -7,7 +7,7 @@ Sistema web de apoio à Oferta de Cuidados Integrados (OCI) da SESAU Recife: pac
 
 ## 2. Visão geral (C4: containers)
 
-Implantação na AWS (ADR-0029, ADR-0030, ADR-0032; desenho de referência em `Arquitetura.PNG`, que simplifica a rede: na implantação real o ALB é interno e há NAT Gateway). O README traz a versão com as camadas de subnet.
+Implantação na AWS (ADR-0029, ADR-0030, ADR-0032). O README traz a versão com as camadas de subnet.
 
 ```mermaid
 flowchart LR
@@ -136,7 +136,7 @@ Implementação (ADR-0011): usuário → `usuario_grupo` → `grupo_papel` → `
   - pausa fora do horário de uso por `infra/scripts/ambiente.sh` (ADR-0036); RDS `db.t4g.micro` com backup de 1 dia no plano gratuito (ADR-0034).
 
   Requisitos de infraestrutura e variáveis por task: ADR-0029, atualizado pelos ADR-0030 e ADR-0032.
-- **CI/CD** (`CICD.PNG`, ADR-0038): PR no GitHub com check do CodeBuild (`cybersec-pr`); merge na `main` dispara o CodePipeline: verificação (segurança e observabilidade), imagens no ECR, aprovação manual por e-mail, migrations, deploy do backend e do frontend. Cada etapa com role própria; o GitHub Actions foi removido (o Dependabot continua).
+- **CI/CD** (ADR-0038): PR no GitHub com check do CodeBuild (`cybersec-pr`); merge na `main` dispara o CodePipeline: verificação (segurança e observabilidade), imagens no ECR, aprovação manual por e-mail, migrations, deploy do backend e do frontend. Cada etapa com role própria; o GitHub Actions foi removido (o Dependabot continua).
 - **Desenvolvimento** (`docker compose up`):
   - `db` (Postgres 18, porta 127.0.0.1:5433, TLS obrigatório com certificado efêmero gerado no container), `backend`, `tarefas` e `frontend` (`http://localhost:3000`);
   - as redes `api` e `dados` são internas: o frontend não alcança o banco;

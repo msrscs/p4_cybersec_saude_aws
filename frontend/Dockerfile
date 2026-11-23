@@ -1,11 +1,11 @@
 # syntax=docker/dockerfile:1
 
-FROM node:26-slim AS deps
+FROM public.ecr.aws/docker/library/node:26-slim AS deps
 WORKDIR /app
 COPY package.json package-lock.json .npmrc ./
 RUN npm ci --omit=dev --ignore-scripts && npm cache clean --force
 
-FROM node:26-slim AS runtime
+FROM public.ecr.aws/docker/library/node:26-slim AS runtime
 # HTTP dentro da VPC: o TLS termina no CloudFront/ALB (ADR-0029). Em produção o processo exige
 # TLS_NA_BORDA=true; ORIGEM_PUBLICA, PROXIES_CONFIAVEIS e IP_CLIENTE_HEADER vêm da task.
 ENV NODE_ENV=production HOST=0.0.0.0 PORT=3000

@@ -10,13 +10,16 @@ set -euo pipefail
 DIR_DB="$(cd "$(dirname "$0")" && pwd)"
 PORTA="${DB_PORT:-5432}"
 NOME="${PG_CONTAINER:-postgres-ci}"
+# Espelho da AWS da imagem oficial (mesmo digest do Docker Hub): o CodeBuild divide IPs com outros
+# clientes e esbarra no limite de pulls anônimos do Docker Hub.
+IMAGEM="${PG_IMAGEM:-public.ecr.aws/docker/library/postgres:18}"
 
 docker run -d --name "$NOME" \
   -e POSTGRES_USER -e POSTGRES_PASSWORD -e POSTGRES_DB \
   -p "127.0.0.1:$PORTA:5432" \
   -v "$DIR_DB:/postgres:ro" \
   --entrypoint /postgres/iniciar.sh \
-  postgres:18 >/dev/null
+  "$IMAGEM" >/dev/null
 
 for _ in $(seq 1 30); do
   # Pela porta TCP: durante o initdb o servidor temporário só atende no socket local.

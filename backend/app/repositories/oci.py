@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import exists, func, literal, select, tuple_
+from sqlalchemy import ColumnElement, exists, func, literal, or_, select, tuple_
 from sqlalchemy.orm import Session
 
 from app.models import Cid, Oci, OciNavegacao, ServicoSaude, TipoOciCid, UnidadeServico
@@ -31,11 +31,17 @@ def buscar_navegacao(db: Session, id_oci: int, id_navegacao: int) -> OciNavegaca
     return db.scalars(consulta.with_for_update(of=OciNavegacao)).one_or_none()
 
 
-def esta_na_unidade(db: Session, id_oci: int, id_unidade: int) -> bool:
-    consulta = select(OciNavegacao.id_oci_navegacao).where(
-        OciNavegacao.id_oci == id_oci, OciNavegacao.id_unidade == id_unidade
+def da_unidade(id_unidade: int) -> ColumnElement[bool]:
+    """A OCI é da unidade que a abriu e de toda unidade com alguma etapa dela (ADR-0025, 0039)."""
+    return or_(
+        Oci.id_unidade_origem == id_unidade,
+        exists().where(OciNavegacao.id_oci == Oci.id_oci, OciNavegacao.id_unidade == id_unidade),
     )
-    return db.scalars(consulta.limit(1)).first() is not None
+
+
+def esta_na_unidade(db: Session, id_oci: int, id_unidade: int) -> bool:
+    consulta = select(Oci.id_oci).where(Oci.id_oci == id_oci, da_unidade(id_unidade))
+    return db.scalars(consulta).first() is not None
 
 
 def listar(
@@ -50,7 +56,7 @@ def listar(
     cpf_paciente_hash: bytes | None = None,
     atrasadas_em: datetime | None = None,
 ) -> list[Oci]:
-    """Mais recentes primeiro. `unidade_do_alcance`: só OCIs com navegação naquela unidade."""
+    """Mais recentes primeiro. `unidade_do_alcance`: só OCIs daquela unidade (`da_unidade`)."""
     consulta = select(Oci).order_by(Oci.data_criacao.desc(), Oci.id_publico.desc()).limit(limite)
     if depois is not None:
         consulta = consulta.where(
@@ -59,11 +65,7 @@ def listar(
         )
     for unidade in (unidade_do_alcance, id_unidade):
         if unidade is not None:
-            consulta = consulta.where(
-                exists().where(
-                    OciNavegacao.id_oci == Oci.id_oci, OciNavegacao.id_unidade == unidade
-                )
-            )
+            consulta = consulta.where(da_unidade(unidade))
     if status is not None:
         consulta = consulta.where(Oci.status == status)
     if id_tipo_oci is not None:

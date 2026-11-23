@@ -13,7 +13,7 @@
 
 FROM ghcr.io/astral-sh/uv:0.13.6 AS uv
 
-FROM python:3.14-slim AS build
+FROM public.ecr.aws/docker/library/python:3.14-slim AS build
 COPY --from=uv /uv /usr/local/bin/uv
 ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy UV_PYTHON_DOWNLOADS=never
 WORKDIR /srv/backend
@@ -27,7 +27,7 @@ COPY backend/scripts/__init__.py backend/scripts/bootstrap_db.py backend/scripts
      backend/scripts/criar_usuario.py backend/scripts/atribuir_grupo.py \
      backend/scripts/resetar_acesso.py ./scripts/
 
-FROM python:3.14-slim AS runtime
+FROM public.ecr.aws/docker/library/python:3.14-slim AS runtime
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 \
     PATH="/srv/backend/.venv/bin:$PATH" PYTHONPATH=/srv/backend
 RUN groupadd --system --gid 10001 app \

@@ -363,6 +363,8 @@ class Oci(Base):
     kek_versao: Mapped[int | None] = mapped_column(SmallInteger)
     resultado_cid_hash: Mapped[bytes | None] = mapped_column(BYTEA, ForeignKey(Cid.cid_hash))
     status: Mapped[str] = mapped_column(Text, default="aberta")
+    # Unidade de quem abriu (ADR-0039): continua vendo a OCI, mesmo com a 1ª etapa em outra.
+    id_unidade_origem: Mapped[int | None] = mapped_column(ForeignKey(UnidadeSaude.id_unidade))
     atualizado_em: Mapped[datetime] = mapped_column(
         TIMESTAMP(timezone=True), server_default=FetchedValue()
     )

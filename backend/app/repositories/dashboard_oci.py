@@ -4,10 +4,11 @@ from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from typing import Any
 
-from sqlalchemy import ColumnElement, Select, case, exists, extract, func, select
+from sqlalchemy import ColumnElement, Select, case, extract, func, select
 from sqlalchemy.orm import InstrumentedAttribute, Session
 
 from app.models import Cid, Oci, OciNavegacao, ServicoSaude, TipoOci, UnidadeSaude
+from app.repositories.oci import da_unidade
 
 _SEGUNDOS_POR_DIA = 86400
 
@@ -45,11 +46,8 @@ class EtapasDoGrupo:
 
 
 def _das_ocis(recorte: Recorte) -> list[ColumnElement[bool]]:
-    """Uma OCI entra se tiver etapa em cada unidade do recorte, a mesma regra da lista."""
-    condicoes: list[ColumnElement[bool]] = [
-        exists().where(OciNavegacao.id_oci == Oci.id_oci, OciNavegacao.id_unidade == unidade)
-        for unidade in recorte.unidades
-    ]
+    """Uma OCI entra se for de cada unidade do recorte (`da_unidade`), a mesma regra da lista."""
+    condicoes: list[ColumnElement[bool]] = [da_unidade(unidade) for unidade in recorte.unidades]
     if recorte.id_tipo_oci is not None:
         condicoes.append(Oci.id_tipo_oci == recorte.id_tipo_oci)
     return condicoes

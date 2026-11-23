@@ -11,7 +11,7 @@
 #   python -m scripts.importar_cadastros (tipos, unidades, serviços, OCI e agendas; depois do CID)
 #   python -m scripts.criar_usuario|atribuir_grupo|resetar_acesso  (interativos, ECS Exec)
 
-FROM ghcr.io/astral-sh/uv:0.13.6 AS uv
+FROM ghcr.io/astral-sh/uv:0.13.9 AS uv
 
 FROM public.ecr.aws/docker/library/python:3.14-slim AS build
 COPY --from=uv /uv /usr/local/bin/uv
